@@ -1,0 +1,35 @@
+{
+  "name": "mavis-brain-viz",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Cytoscape graph viewer for a Mavis brain: builds data.json from the markdown tree and renders entries, links, and projects.",
+  "license": "MIT",
+  "author": "Thaqif",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/takippu/Mavis.git",
+    "directory": "viz"
+  },
+  "bugs": {
+    "url": "https://github.com/takippu/Mavis/issues"
+  },
+  "homepage": "https://github.com/takippu/Mavis/tree/main/viz#readme",
+  "type": "module",
+  "scripts": {
+    "build:data": "tsx scripts/build-data.ts",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "start": "npm run build:data && vite"
+  },
+  "dependencies": {
+    "cytoscape": "^3.30.2",
+    "marked": "^12.0.2"
+  },
+  "devDependencies": {
+    "@types/cytoscape": "^3.21.4",
+    "tsx": "^4.16.2",
+    "typescript": "^5.4.5",
+    "vite": "^5.4.0"
+  }
+}

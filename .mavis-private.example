@@ -1,0 +1,60 @@
+# .mavis-private.example — copy to `.mavis-private` (which is gitignored) and edit.
+#
+# The leak guard (`node scripts/check-leaks.mjs`) derives most of what counts as "personal"
+# straight from your own gitignored brain: every directory under `projects/`, the `name:` in
+# `identity/profile.md`, your `git config user.name` and `user.email`, your OS username and home
+# directory. Run `node scripts/check-leaks.mjs --explain` to see the full derived list and where
+# each term came from.
+#
+# This file covers the three things derivation cannot get right on its own.
+#
+# ---------------------------------------------------------------------------
+# deny: <term>
+#   Something personal the brain does not know about.
+#
+#   Use it for a client you have never made a project directory for, a live promo code, an
+#   internal hostname, or a project slug shorter than 4 characters (the derivation skips those
+#   deliberately, because short terms fire inside unrelated words).
+#
+#   An explicit deny has no minimum length — a 3-letter client code is honoured.
+
+# deny: acme-corp
+# deny: LAUNCH25
+# deny: internal.example.com
+
+# ---------------------------------------------------------------------------
+# allow: <term>
+#   A derived term that is not actually a secret, silenced everywhere.
+#
+#   Two common cases. First, a project slug that is also an ordinary word — if you have a project
+#   directory called `team`, `core` or `notes`, the guard would fire on any sentence containing
+#   it. Second, an identity you have deliberately chosen to publish: if your name is the copyright
+#   holder in LICENSE, it is public by design and should not block every commit.
+#
+#   Allow is a blunt instrument — it silences the term in every file. Prefer `allowpath` when only
+#   one file legitimately needs it.
+
+# allow: team
+# allow: YourName
+
+# ---------------------------------------------------------------------------
+# allowpath: <path>
+#   A whole file that is allowed to contain derived terms.
+#
+#   Some files legitimately must: LICENSE names the copyright holder, and .gitignore describes the
+#   very directories the terms are derived from. Without this they would fire on every commit
+#   forever, which is exactly how a guard teaches its owner to type --no-verify by reflex.
+#
+#   Matching is simple: exact path, a directory prefix ending in `/`, or a trailing `*`.
+
+# allowpath: LICENSE
+# allowpath: .gitignore
+# allowpath: docs/examples/
+
+# ---------------------------------------------------------------------------
+# Per-line escape
+#   For a single line that genuinely needs a term, put `leak-guard-allow` in a comment on that
+#   line. It stays visible in review, unlike a file-wide exemption.
+#
+# One-off override
+#   git commit --no-verify

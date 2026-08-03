@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/hooks/leak-guard-write.mjs",
+            "timeout": 20,
+            "statusMessage": "Checking for personal content"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,90 @@
+# User-specific brain data — never publish.
+# Anchored to the repo root (leading /) so nested public dirs like seeds/<category>/ still ship.
+/identity/
+/projects/
+/daily-memories/
+/standups/
+.setup-complete
+/topic_index.md
+/topic_details/
+/preferences/
+/rules/
+/topics/
+/memory/
+
+# Backups, anywhere. Deliberately UNANCHORED: brain-repair.mjs writes /_backup/, but a stray
+# skills/_backup/ or docs/_backup/ from a hand-copy is the same class of leak and the anchored
+# form missed it.
+_backup/
+
+# Kept locally, never published. Holds the pre-OSS history bundle plus everything pulled out of
+# the public tree that is still wanted on this machine: the completed one-off migration scripts,
+# the internal engineering plans, the poc-headless spike, and a third-party skill this repo has
+# no licence to redistribute. Ignored rather than deleted — nothing is lost, it just does not ship.
+/_local/
+
+# Leak-guard tuning: names your clients, promo codes and internal hosts, so it is itself personal.
+# The shipped template is `.mavis-private.example`.
+/.mavis-private
+
+# Local-only / per-machine
+workspace/
+.superpowers/
+
+# Claude Code config. `.claude/*` rather than `.claude/` on purpose: with a trailing slash git
+# never descends into the directory, so a negation inside it can never re-include anything.
+# settings.json is SHARED project config and ships (it wires the write-time leak guard, which is
+# worthless if every cloner has to install it by hand). settings.local.json holds personal
+# permissions and stays out.
+.claude/*
+!.claude/settings.json
+
+# Secrets and machine-local tool config. None of these are tracked today; the point is that a
+# user who follows skills/connect-pm-mcp/SKILL.md WILL create a .mcp.json holding a real token,
+# and project-writer.js already writes `.env` into the .gitignore of every project it scaffolds —
+# this repo should not hold itself to a lower standard than the projects it generates.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+.mcp.json
+.claude.json
+service-account*.json
+google-services.json
+
+# The packaged terminal-app dropped here by `npm run dist` (terminal-app/scripts/copy-portable.js)
+# so it's one double-click from the brain root. A ~100MB build artifact, never committed.
+/Mavis-Terminal.exe
+
+# Node — unanchored, so terminal-app/ and viz/ are both covered.
+node_modules/
+
+# Python bytecode. skills/portrait-cutout ships cutout.py, and a tracked .pyc embedded the
+# author's absolute Windows path in its bytecode.
+__pycache__/
+*.pyc
+*.pyo
+
+# OS junk
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor
+.vscode/
+.idea/
+.obsidian/
+*.swp
+*.swo
+*.swn
+*~
+
+# brain-viz tool — installed deps + generated data
+viz/dist/
+viz/public/data.json
+viz/.vite/

@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mavis Brain Viz</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <div id="cy"></div>
+
+    <div id="search">
+      <input id="search-input" type="text" placeholder="search nodes... (Ctrl+K)" autocomplete="off" spellcheck="false" />
+      <div id="search-results" class="empty"></div>
+    </div>
+
+    <aside id="panel">
+      <header class="panel-header">
+        <div class="panel-titles">
+          <h2 class="panel-title"></h2>
+          <small class="panel-path"></small>
+        </div>
+        <div class="panel-actions">
+          <button id="panel-edit" class="panel-btn">edit</button>
+          <button id="panel-save" class="panel-btn panel-btn-primary" hidden>save</button>
+          <button id="panel-cancel" class="panel-btn" hidden>cancel</button>
+          <button id="panel-close" class="panel-btn" aria-label="Close">&times;</button>
+        </div>
+      </header>
+      <div class="panel-status" hidden></div>
+      <div class="panel-body"></div>
+      <textarea class="panel-editor" hidden spellcheck="false"></textarea>
+    </aside>
+
+    <div id="legend">
+      <div class="legend-item"><span class="legend-dot" style="background:#7aa2f7"></span>identity</div>
+      <div class="legend-item"><span class="legend-dot" style="background:#a9b1d6"></span>core</div>
+      <div class="legend-item"><span class="legend-dot" style="background:#9ece6a"></span>projects</div>
+      <div class="legend-item"><span class="legend-dot" style="background:#ff9e64"></span>daily-memories</div>
+      <div class="legend-item"><span class="legend-dot" style="background:#bb9af7"></span>skills</div>
+      <div class="legend-tip">click category to expand &middot; click leaf to view &middot; hover to focus + reveal connections &middot; Ctrl+K to search &middot; ESC to close panel</div>
+      <div class="legend-buttons">
+        <button id="relayout-btn" class="legend-reset">re-layout</button>
+        <button id="reset-btn" class="legend-reset">reset view</button>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

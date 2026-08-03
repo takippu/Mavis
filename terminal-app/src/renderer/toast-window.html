@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self' file: data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'" />
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; background: transparent; overflow: hidden;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; -webkit-user-select: none; user-select: none; cursor: default; }
+
+  /* Theme-aware toast. Colours arrive in toast:data (resolved from the main window's active theme)
+     and override the --t-* vars; these defaults (a readable dark card) only cover the first paint
+     before data lands. The surface is near-opaque for legibility, with a light blur so it still reads
+     as glass. No left accent strip. */
+  :root {
+    --t-surf-a: rgba(28,30,34,.96); --t-surf-b: rgba(20,22,26,.93);
+    --t-ink: #f4efe6; --t-body: #c9c2b6; --t-muted: #8f8a80;
+    --t-border: rgba(255,255,255,.16); --t-catch: rgba(255,255,255,.12);
+  }
+  #card { box-sizing: border-box; margin: 7px; height: calc(100% - 14px);
+    display: flex; align-items: center; gap: 12px; padding: 0 13px;
+    border-radius: 15px; position: relative; overflow: hidden; cursor: pointer;
+    background: linear-gradient(157deg, var(--t-surf-a) 0%, var(--t-surf-b) 100%);
+    border: 1px solid var(--t-border);
+    box-shadow: inset 0 1px 0 var(--t-catch), 0 14px 38px rgba(0,0,0,.42);
+    -webkit-backdrop-filter: blur(15px) saturate(1.2); backdrop-filter: blur(15px) saturate(1.2); }
+
+  #logo { flex: none; width: 30px; height: 30px; border-radius: 8px; object-fit: contain;
+    box-shadow: 0 2px 9px rgba(0,0,0,.28); }
+  #main { min-width: 0; flex: 1; }
+  #title { font-size: 13px; font-weight: 650; color: var(--t-ink); letter-spacing: .01em;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #body { font-size: 12px; line-height: 1.36; color: var(--t-body); margin-top: 2px;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  #close { flex: none; align-self: flex-start; margin-top: 2px; border: none; background: none;
+    color: var(--t-muted); font-size: 15px; line-height: 1; cursor: pointer; padding: 2px 3px; border-radius: 6px; }
+  #close:hover { color: var(--t-ink); background: rgba(127,127,127,.18); }
+
+  @keyframes slidein { from { opacity: 0; transform: translateX(20px) scale(.985); } to { opacity: 1; transform: none; } }
+  #card.in { animation: slidein .2s cubic-bezier(.22,.61,.36,1) both; }
+</style>
+</head>
+<body>
+  <div id="card">
+    <img id="logo" src="assets/mavis-logo.png" alt="" />
+    <div id="main"><div id="title">Mavis</div><div id="body"></div></div>
+    <button id="close" aria-label="Dismiss">&times;</button>
+  </div>
+  <script>
+    var card = document.getElementById('card'), titleEl = document.getElementById('title'), bodyEl = document.getElementById('body'), closeEl = document.getElementById('close');
+    // hex (#rrggbb) -> rgba() so a solid theme colour can carry the toast's translucency.
+    function rgba(hex, a) { var m = /^#?([0-9a-fA-F]{6})$/.exec((hex || '').trim()); if (!m) return null; var n = parseInt(m[1], 16); return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')'; }
+    function applyTheme(t) {
+      if (!t || !t.surface) return; // keep the dark defaults if no palette came through
+      var r = document.documentElement.style;
+      r.setProperty('--t-surf-a', rgba(t.surface, .96) || t.surface);
+      r.setProperty('--t-surf-b', rgba(t.surface, .92) || t.surface);
+      if (t.ink) { r.setProperty('--t-ink', t.ink); r.setProperty('--t-border', rgba(t.ink, .2) || 'rgba(127,127,127,.25)'); r.setProperty('--t-catch', rgba(t.ink, .07) || 'transparent'); }
+      if (t.ash) r.setProperty('--t-body', t.ash);
+      if (t.graphite) r.setProperty('--t-muted', t.graphite);
+    }
+    if (window.toastApi) {
+      window.toastApi.onData(function (p) {
+        applyTheme(p && p.theme);
+        titleEl.textContent = (p && p.title) || 'Mavis';
+        bodyEl.textContent = (p && p.body) || '';
+        card.classList.remove('in'); void card.offsetWidth; card.classList.add('in');
+      });
+    }
+    card.addEventListener('click', function () { if (window.toastApi) window.toastApi.click(); });
+    closeEl.addEventListener('click', function (e) { e.stopPropagation(); if (window.toastApi) window.toastApi.dismiss(); });
+  </script>
+</body>
+</html>

@@ -1,0 +1,48 @@
+# Pin line endings so a checkout cannot change file CONTENT.
+#
+# Git for Windows ships core.autocrlf=true as a SYSTEM default. Without the rules below, a plain
+# `git checkout` on Windows rewrites every text file to CRLF in the working copy -- which made
+# the generated CLAUDE.md differ from what `sync-contract.mjs` renders from AGENTS.md by line
+# endings alone, producing a permanent phantom `FAIL contract-sync` in `lint-brain.mjs` and in
+# the terminal app's Brain Health card. `--write` did not clear it: the next checkout converted
+# the file straight back.
+#
+# `text=auto eol=lf` normalises to LF in the repository AND checks out LF everywhere, so the
+# bytes on disk match the bytes in the object store on every platform.
+
+* text=auto eol=lf
+
+# Explicit for the formats that carry contract, code, or shell semantics. `.md` matters because
+# the contract files are Markdown; the hooks matter because a CRLF shebang line makes the kernel
+# fail to exec the interpreter on Linux and macOS with a bare "bad interpreter" error.
+*.md    text eol=lf
+*.mjs   text eol=lf
+*.js    text eol=lf
+*.json  text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+*.sh    text eol=lf
+*.py    text eol=lf
+scripts/git-hooks/* text eol=lf
+
+# Windows batch files are the one exception -- cmd.exe requires CRLF.
+*.bat   text eol=crlf
+*.cmd   text eol=crlf
+
+# Never touch binaries. Left to `text=auto` a stray CR/LF byte inside one would be "corrected"
+# and the file silently corrupted.
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.webp  binary
+*.pdf   binary
+*.woff  binary
+*.woff2 binary
+*.ttf   binary
+*.otf   binary
+*.exe   binary
+*.dll   binary
+*.node  binary
+*.bundle binary

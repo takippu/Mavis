@@ -1,0 +1,1371 @@
+/* Steep — design tokens + components for Mavis-Terminal.
+   See projects/mavis-terminal/references/steep-style.md.
+   Fonts: free/system fallbacks for v1 (drop real Source Serif 4 / Inter woff2 into
+   ./fonts and add @font-face later — see the commented block at the bottom). */
+
+:root {
+  --color-ink: #17191c;
+  --color-pure-white: #ffffff;
+  --color-fog: #f7f7f8;
+  --color-ash: #4c4c4c;
+  --color-graphite: #6b6f78;   /* darkened from #777b86 to clear WCAG AA on small text */
+  --color-dove: #a3a6af;       /* hairlines + placeholders only (not body text) */
+  --color-rust: #5d2a1a;
+  --color-apricot-wash: #fbe1d1;
+  --color-sky-wash: #d3e3fc;
+  --hairline: #ececef;
+  --hairline-soft: #f0f0f2;
+
+  --sidebar-w: 210px;   /* the brand zone in the titlebar matches this so the tab strip lands on the terminal */
+
+  /* semantic button (so the ink CTA inverts correctly on dark themes) */
+  --btn-bg: #17191c;
+  --btn-fg: #ffffff;
+
+  /* chart palette — read by charts.js at render (CSS vars don't resolve in SVG attrs) */
+  --chart-accent: #5d2a1a;
+  --chart-ink: #17191c;
+  --chart-track: #efe9e7;
+  --chart-bub1: #7d3a23;
+  --chart-bub2: #4a2014;
+
+  /* terminal pane palette — read by session-view.js (the dark Ink pane, theme-tinted) */
+  --term-bg: #17191c;
+  --term-fg: #e8e0d4;
+  --term-cursor: #cf8a6a;
+  --term-sel: #3a2f1e;
+
+  --font-signifier: "Source Serif 4", Georgia, "Times New Roman", serif; /* >=40px only */
+  --font-sohne: "Inter", ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "Cascadia Mono", Consolas, ui-monospace, monospace;
+
+  --radius-cards: 24px;
+  --radius-inputs: 16px;
+  --radius-pill: 9999px;
+  --shadow-card: rgba(4,23,43,.05) 0 0 0 1px, rgba(0,0,0,.06) 0 20px 25px -5px, rgba(0,0,0,.06) 0 8px 10px -6px;
+  --shadow-soft: rgba(4,23,43,.04) 0 0 0 1px, rgba(0,0,0,.08) 0 4px 10px -6px;
+}
+
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; height: 100%; overflow: hidden;
+  background: var(--color-fog); color: var(--color-ink);
+  font-family: var(--font-sohne); font-size: 16px; letter-spacing: -0.009em;
+  -webkit-font-smoothing: antialiased;
+}
+
+#app { display: flex; flex-direction: column; height: 100vh; }
+
+/* keyboard focus is visible on every interactive control */
+:focus-visible { outline: 2px solid var(--color-rust); outline-offset: 2px; border-radius: 4px; }
+.mt-search input:focus-visible, .mt-palette-input:focus-visible { outline: none; }
+.mt-search:focus-within { box-shadow: var(--shadow-soft), 0 0 0 2px var(--color-rust); }
+
+/* ---------- title bar (frameless chrome) ---------- */
+.mt-titlebar {
+  height: 46px; flex: none;
+  background: var(--color-pure-white); border-bottom: 1px solid var(--hairline);
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 8px 0 16px; gap: 12px;
+  -webkit-app-region: drag; user-select: none;
+}
+.mt-titlebar .no-drag, .mt-titlebar button, .mt-tab, .mt-kbar, .mt-wc-btn { -webkit-app-region: no-drag; }
+.mt-tb-left { display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1; }
+.mt-tb-right { display: flex; align-items: center; gap: 14px; flex: none; }
+/* brand zone spans the sidebar width (+ the terminal card's 12px inset, − the titlebar's 16px
+   pad − the 12px tb-left gap) so the tab strip's left edge lands on the terminal card. */
+.mt-brand { display: flex; align-items: center; gap: 10px; flex: none; width: calc(var(--sidebar-w) - 16px); }
+.mt-brand-dot { width: 13px; height: 13px; border-radius: 50%; background: var(--color-ink); }
+.mt-brand-logo { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; object-position: center top; display: block; background: var(--color-fog); }
+.mt-brand-name { font-size: 18px; font-weight: 600; letter-spacing: -0.01em; }
+
+.mt-tabs { display: flex; align-items: center; gap: 6px; overflow-x: auto; min-width: 0; }
+.mt-tabs::-webkit-scrollbar { height: 0; }
+/* Session-tab visuals live in topbar.css (Direction C — underline-minimal), loaded AFTER this file.
+   The pill-era rules (.mt-tab padding/border/radius/background, .active, .tinted, :hover, .mt-tab-close,
+   .dragging, the label-dim) were removed here so they no longer fight topbar.css. Only the strip
+   layout (.mt-tabs above), the ellipsizing label base, and the activity dot (.mt-tab-dot*, further
+   down) stay in steep.css — all reused by Direction C. */
+.mt-tab-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.mt-kbar {
+  display: flex; align-items: center; gap: 8px; cursor: pointer;
+  background: var(--color-fog); border: 1px solid var(--hairline); border-radius: var(--radius-pill);
+  padding: 6px 14px; color: var(--color-graphite); font-size: 13px;
+}
+.mt-kbar .hint { color: var(--color-graphite); }
+.mt-wc { display: flex; align-items: center; gap: 2px; }
+.mt-wc-btn {
+  width: 38px; height: 30px; border: none; background: none; cursor: pointer;
+  color: var(--color-graphite); font-size: 13px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+}
+.mt-wc-btn:hover { background: var(--color-fog); color: var(--color-ink); }
+.mt-wc-btn.close:hover { background: #f3d9d2; color: #5d2a1a; }
+
+/* ---------- shell ---------- */
+.mt-shell { flex: 1; display: flex; min-height: 0; }
+.mt-sidebar {
+  width: var(--sidebar-w); flex: none; background: var(--color-fog);
+  border-right: 1px solid var(--hairline); padding: 16px 12px;
+  display: flex; flex-direction: column;
+}
+/* Section HEADINGs ("Workspace"/"Memory"/"Tools") — a direct child of #sidebar, or the "Workspace"
+   label sharing the top header row with the collapse toggle (.mt-nav-head). Scoped so it doesn't also
+   style the per-nav-item text span (which carries .mt-nav-label too, as the icon-rail hide-hook). */
+#sidebar > .mt-nav-label, .mt-nav-head > .mt-nav-label { font-size: 11px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; color: var(--color-graphite); padding: 0 10px; margin-bottom: 10px; }
+#sidebar > .mt-nav-label:not(:first-child) { margin-top: 16px; }
+/* top header row: the "Workspace" heading (left) + the collapse toggle (right) on one line. */
+.mt-nav-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.mt-nav-head > .mt-nav-label { margin-bottom: 0; }
+.mt-nav {
+  display: flex; align-items: center; gap: 10px; cursor: pointer;
+  padding: 9px 12px; border-radius: 12px; color: var(--color-ash);
+  font-size: 15px; font-weight: 430; margin-bottom: 3px;
+  width: 100%; text-align: left; border: none; background: none; font-family: inherit;
+}
+.mt-nav:hover { background: rgba(0,0,0,.02); }
+/* nav count badge (Changes = files with uncommitted changes). margin-left:auto pins it to the
+   right edge of the flex row; hidden entirely at zero, so it reads as "there is work" not "0". */
+.mt-nav-badge {
+  margin-left: auto; flex: none;
+  min-width: 18px; padding: 0 5px; border-radius: var(--radius-pill);
+  background: var(--color-rust); color: var(--color-pure-white);
+  font-size: 10px; font-weight: 600; line-height: 17px; text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.mt-nav.active .mt-nav-badge { background: var(--color-rust); }
+.mt-nav.active { background: var(--color-pure-white); color: var(--color-ink); font-weight: 450; box-shadow: var(--shadow-soft); }
+.mt-nav-dot { width: 8px; height: 8px; border-radius: 50%; border: 1px solid var(--color-dove); flex: none; }
+.mt-nav.active .mt-nav-dot { background: var(--color-rust); border-color: var(--color-rust); }
+
+/* Ask Mavis — compact titlebar action (moved out of the sidebar): a black accent pill with a
+   glossy glare sweep on hover + a sparkle icon. Stays black across every theme (deliberate accent). */
+.mt-tb-ask {
+  position: relative; overflow: hidden; display: flex; align-items: center; gap: 7px;
+  flex: none; font-family: inherit; cursor: pointer;
+  padding: 6px 14px; border-radius: var(--radius-pill);
+  border: 1px solid rgba(255,255,255,.12); background: #0b0b0d; color: #f4efe6;
+  font-size: 13px; font-weight: 520; letter-spacing: .01em;
+  box-shadow: 0 2px 8px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.08);
+  transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+}
+.mt-tb-ask:hover { border-color: rgba(255,255,255,.2); transform: translateY(-1px); box-shadow: 0 5px 14px rgba(0,0,0,.36), inset 0 1px 0 rgba(255,255,255,.1); }
+.mt-tb-ask.active { border-color: transparent; box-shadow: 0 0 0 1.5px var(--color-rust), 0 3px 10px rgba(0,0,0,.34); }
+/* always-on top specular sheen */
+.mt-tb-ask::after { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 48%; pointer-events: none; background: linear-gradient(180deg, rgba(255,255,255,.12), transparent); }
+/* glossy glare that sweeps across on hover */
+.mt-tb-ask::before {
+  content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: 55%; pointer-events: none;
+  background: linear-gradient(105deg, transparent 0%, rgba(255,255,255,.22) 50%, transparent 100%);
+  transform: translateX(-180%) skewX(-12deg); transition: transform .6s cubic-bezier(.22,.61,.36,1);
+}
+.mt-tb-ask:hover::before { transform: translateX(340%) skewX(-12deg); }
+.mt-tb-ask .mt-ask-ico, .mt-tb-ask .mt-ask-label { position: relative; z-index: 1; }
+.mt-tb-ask .mt-ask-ico { display: flex; color: #e9b9a3; }
+.mt-tb-ask .mt-ask-ico svg { width: 16px; height: 16px; }
+
+.mt-nav-spacer { flex: 1; }
+.mt-nav-version { display: flex; align-items: baseline; gap: 6px; padding: 10px 12px 2px; margin-top: 4px; border-top: 1px solid var(--hairline); font-size: 11px; letter-spacing: .02em; cursor: default; user-select: none; }
+.mt-ver-name { color: var(--color-graphite); }
+.mt-ver-num { color: var(--color-dove); font-variant-numeric: tabular-nums; margin-left: auto; }
+
+/* confirm dialog (MT.confirm) — guards destructive actions like closing a live session */
+.mt-confirm-overlay { position: fixed; inset: 0; z-index: 80; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.34); opacity: 0; transition: opacity .14s ease; }
+.mt-confirm-overlay.in { opacity: 1; }
+.mt-confirm { width: min(384px, calc(100vw - 48px)); background: var(--color-pure-white); border: 1px solid var(--hairline); border-radius: 14px; padding: 20px 20px 16px; box-shadow: 0 20px 60px rgba(0,0,0,.28); transform: translateY(7px) scale(.99); transition: transform .16s cubic-bezier(.22,.61,.36,1); }
+.mt-confirm-overlay.in .mt-confirm { transform: none; }
+.mt-confirm-title { font-size: 15px; font-weight: 600; color: var(--color-ink); margin-bottom: 6px; }
+.mt-confirm-msg { font-size: 13.5px; line-height: 1.5; color: var(--color-ash); }
+.mt-confirm-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+.mt-confirm-btn { padding: 8px 15px; border-radius: 9px; border: 1px solid var(--hairline); background: var(--color-pure-white); color: var(--color-ash); font-size: 13px; font-weight: 500; font-family: inherit; cursor: pointer; }
+.mt-confirm-btn:hover { background: var(--color-fog); color: var(--color-ink); }
+.mt-confirm-btn.danger { background: #b3392a; border-color: transparent; color: #fff; }
+.mt-confirm-btn.danger:hover { background: #c2412f; color: #fff; }
+.mt-confirm-btn.primary { background: var(--btn-bg, var(--color-ink)); border-color: transparent; color: var(--btn-fg, #fff); }
+
+.mt-main { flex: 1; min-width: 0; position: relative; background: var(--color-fog); }
+.mt-view-host { position: absolute; inset: 0; overflow-y: auto; padding: 28px 30px; }
+.mt-sessions-host { position: absolute; inset: 0; }
+.hidden { display: none !important; }
+
+/* ---------- typography / shared ---------- */
+.mt-greeting { font-family: var(--font-signifier); font-size: 44px; line-height: 1.1; letter-spacing: -0.025em; color: var(--color-ink); }
+.mt-page-title { font-family: var(--font-signifier); font-size: 40px; line-height: 1.1; letter-spacing: -0.025em; }
+.mt-sub { font-size: 16px; color: var(--color-ash); margin-top: 6px; }
+.mt-label { font-size: 11px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; color: var(--color-graphite); }
+
+/* ---------- cards ---------- */
+.mt-card { background: var(--color-pure-white); border-radius: var(--radius-cards); box-shadow: var(--shadow-card); }
+.mt-card-warm { background: var(--color-apricot-wash); border-radius: var(--radius-cards); }
+.mt-card-cool { background: var(--color-sky-wash); border-radius: var(--radius-cards); }
+
+.mt-pill { background: var(--btn-bg); color: var(--btn-fg); font-size: 13px; font-weight: 450; border: none; cursor: pointer; border-radius: var(--radius-pill); padding: 7px 18px; font-family: inherit; }
+.mt-pill:hover { opacity: .92; }
+.mt-link { background: none; border: none; cursor: pointer; color: var(--color-ink); font-size: 14px; font-weight: 450; }
+
+/* type chips are monochrome chrome — Steep reserves the washes for data cards only */
+.mt-type-pill { font-size: 12px; border-radius: var(--radius-pill); padding: 2px 9px; color: var(--color-graphite); background: var(--color-fog); }
+.mt-type-warm { color: var(--color-graphite); background: var(--color-fog); }
+.mt-type-cool { color: var(--color-graphite); background: var(--color-fog); }
+
+.mt-search {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--color-pure-white); border-radius: var(--radius-inputs);
+  box-shadow: var(--shadow-soft); padding: 9px 14px; color: var(--color-graphite); font-size: 14px;
+}
+.mt-search input { border: none; outline: none; background: none; font: inherit; color: var(--color-ink); flex: 1; }
+.mt-search input::placeholder { color: var(--color-dove); }
+
+/* dashboard */
+.mt-tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin: 22px 0; }
+.mt-tile { padding: 18px 20px; }
+.mt-tile-num { font-family: var(--font-sohne); font-weight: 480; font-size: 34px; line-height: 1; }
+.mt-tile-label { font-size: 13px; color: var(--color-graphite); margin-top: 8px; }
+.mt-cols { display: grid; grid-template-columns: 1.15fr 1fr; gap: 14px; }
+.mt-row { display: flex; align-items: center; justify-content: space-between; }
+.mt-row + .mt-row { border-top: 1px solid var(--hairline-soft); }
+.mt-row-name { font-size: 15px; font-weight: 450; }
+.mt-row-sub { font-size: 12px; color: var(--color-graphite); font-family: var(--font-mono); margin-top: 1px; }
+.mt-bar { height: 6px; background: var(--hairline-soft); border-radius: var(--radius-pill); overflow: hidden; }
+.mt-bar > span { display: block; height: 100%; background: var(--color-rust); border-radius: var(--radius-pill); }
+
+/* ---------- dashboard charts (pulse · radial · rings · constellation) ---------- */
+.mt-cols-charts { margin-bottom: 14px; align-items: stretch; }
+.mt-chart-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 16px; }
+.mt-chart-sub { font-size: 12px; color: var(--color-graphite); font-family: var(--font-mono); flex: none; }
+
+/* pulse hero */
+.mt-pulse-card { padding: 20px 24px 16px; margin-bottom: 18px; }
+.mt-pulse { position: relative; }
+.mt-pulse-stat { position: absolute; top: 0; left: 0; pointer-events: none; }
+.mt-pulse-big { font-family: var(--font-signifier); font-size: 46px; line-height: 1; letter-spacing: -0.03em; color: var(--color-ink); }
+.mt-pulse-big-u { font-family: var(--font-sohne); font-size: 15px; font-weight: 430; color: var(--color-graphite); letter-spacing: 0; margin-left: 8px; }
+.mt-pulse-svg { display: block; margin-top: 6px; cursor: crosshair; touch-action: none; }
+.mt-pulse-area { animation: mt-fade-in 1.3s ease .1s both; }
+.mt-pulse-line { stroke-dasharray: 1; stroke-dashoffset: 0; animation: mt-pulse-draw 1.5s cubic-bezier(.22,.61,.36,1) .1s both; }
+@keyframes mt-pulse-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+.mt-pulse-beacon { transform-box: fill-box; transform-origin: center; animation: mt-pulse-halo 1.9s ease-in-out infinite; }
+@keyframes mt-pulse-halo { 0%,100% { opacity:.5; transform: scale(1); } 50% { opacity:0; transform: scale(2.6); } }
+.mt-pulse-guide, .mt-pulse-cursor { transition: opacity .12s ease; pointer-events: none; }
+
+/* 3-up row */
+.mt-cols-3 { grid-template-columns: 1.05fr 1fr 1.15fr; }
+.mt-chart-card { padding: 18px 20px; display: flex; flex-direction: column; }
+.mt-chart-card .mt-chart-head { margin-bottom: 10px; }
+
+/* radial year */
+.mt-radial { display: block; width: 100%; max-width: 280px; margin: 4px auto 0; }
+.mt-radial-seg { opacity: 0; animation: mt-fade-in .5s ease forwards; transition: filter .12s ease; cursor: pointer; }
+.mt-radial-seg.hot { filter: brightness(1.14) saturate(1.1); }
+@keyframes mt-fade-in { to { opacity: 1; } }
+.mt-radial-total { font-family: var(--font-signifier); font-size: 32px; fill: var(--color-ink); }
+.mt-radial-cap { font-size: 10px; letter-spacing: .07em; text-transform: uppercase; fill: var(--color-graphite); }
+
+/* momentum rings */
+.mt-rings { display: flex; flex-direction: column; align-items: center; }
+.mt-rings-svg { display: block; width: 100%; max-width: 190px; margin: 0 auto; }
+.mt-ring-fill { transform: rotate(-90deg); transform-origin: center; animation: mt-ring-draw 1.4s cubic-bezier(.22,.61,.36,1) forwards; }
+@keyframes mt-ring-draw { from { stroke-dashoffset: var(--circ); } to { stroke-dashoffset: var(--off); } }
+.mt-ring-hit { cursor: pointer; }
+.mt-rings-num { font-family: var(--font-signifier); font-size: 30px; fill: var(--color-ink); }
+.mt-rings-cap { font-size: 9px; letter-spacing: .08em; text-transform: uppercase; fill: var(--color-graphite); }
+.mt-rings-legend { width: 100%; margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
+.mt-rings-leg-row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.mt-rings-sw { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.mt-rings-leg-l { color: var(--color-ash); }
+.mt-rings-leg-v { margin-left: auto; color: var(--color-ink); font-weight: 500; font-family: var(--font-mono); font-size: 12px; }
+
+/* constellation */
+.mt-constel { display: flex; flex-wrap: wrap; align-items: center; align-content: center; justify-content: center; gap: 18px 16px; padding: 10px 0 6px; min-height: 210px; }
+.mt-bub { border: none; padding: 0; cursor: pointer; border-radius: 50%; color: #fff; flex: none; display: flex; align-items: center; justify-content: center; text-align: center;
+  background: radial-gradient(circle at 32% 28%, var(--chart-bub1), var(--chart-bub2)); box-shadow: 0 6px 16px rgba(20,22,26,.14);
+  opacity: 0; transform: scale(.3); animation: mt-bub-pop .55s cubic-bezier(.34,1.56,.64,1) forwards, mt-bub-float 6s ease-in-out infinite; }
+.mt-bub.paused { background: radial-gradient(circle at 32% 28%, #8b8f98, #5c606a); }
+.mt-bub-in { padding: 4px; line-height: 1.05; }
+.mt-bub-n { font-size: 15px; font-weight: 600; }
+.mt-bub-name { font-size: 10px; opacity: .9; max-width: 82px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mt-bub:hover { filter: brightness(1.08); }
+@keyframes mt-bub-pop { to { opacity: 1; transform: scale(1); } }
+@keyframes mt-bub-float { 0%,100% { translate: 0 0; } 50% { translate: 0 -6px; } }
+
+/* shared chart tooltip */
+.mt-tip { position: fixed; z-index: 1200; pointer-events: none; opacity: 0; transform: translateY(2px); transition: opacity .1s ease;
+  background: var(--btn-bg); color: var(--btn-fg); border-radius: 10px; padding: 7px 11px; box-shadow: var(--shadow-card); max-width: 240px; }
+.mt-tip.show { opacity: 1; transform: translateY(0); }
+.mt-tip-t { font-size: 13px; font-weight: 500; }
+.mt-tip-s { font-size: 11px; color: #c9ccd2; margin-top: 1px; font-family: var(--font-mono); }
+
+@media (prefers-reduced-motion: reduce) {
+  .mt-pulse-area, .mt-pulse-line { animation: none; }
+  .mt-pulse-beacon { animation: none; }
+  .mt-radial-seg, .mt-bub { animation: none !important; opacity: 1; transform: none; }
+  .mt-ring-fill { animation: none; stroke-dashoffset: var(--off); }
+  .mt-tab-dot.attention { animation: none; }
+}
+
+/* projects grid */
+.mt-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+@media (max-width: 900px) { .mt-grid { grid-template-columns: repeat(2, 1fr); } .mt-tiles { grid-template-columns: repeat(2,1fr);} .mt-cols{grid-template-columns:1fr;} .mt-cols-3{grid-template-columns:1fr;} }
+.mt-proj { padding: 16px 18px; cursor: pointer; box-shadow: var(--shadow-soft); }
+.mt-proj:hover, .mt-proj.focus { box-shadow: 0 0 0 1.5px var(--color-rust), rgba(0,0,0,.08) 0 20px 25px -5px; }
+/* whole-card tint when the project has a colour (not just the dot) — washed bg + a ring in the colour */
+.mt-proj.tinted { background: color-mix(in srgb, var(--cardc) 13%, var(--color-pure-white)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cardc) 32%, transparent), var(--shadow-soft); }
+.mt-proj.tinted:hover, .mt-proj.tinted.focus { box-shadow: 0 0 0 1.5px var(--cardc), rgba(0,0,0,.08) 0 20px 25px -5px; }
+.mt-proj-name { font-size: 15px; font-weight: 480; }
+.mt-proj-path { font-family: var(--font-mono); font-size: 11px; color: var(--color-graphite); margin-top: 7px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mt-empty { color: var(--color-graphite); font-size: 14px; padding: 20px; }
+
+/* session — dark Ink terminal panes (a tile-tree of splits per tab) */
+.mt-session-pane { position: absolute; inset: 0; padding: 12px; display: none; }
+.mt-session-pane.active { display: flex; }
+.mt-session-pane > * { flex: 1 1 0%; min-width: 0; min-height: 0; }
+.mt-split { display: flex; min-width: 0; min-height: 0; }
+.mt-split.row { flex-direction: row; }
+.mt-split.col { flex-direction: column; }
+.mt-split > * { min-width: 0; min-height: 0; }
+.mt-pane { position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0; border-radius: var(--radius-cards); overflow: hidden; background: var(--term-bg); box-shadow: rgba(0,0,0,.12) 0 20px 25px -5px, rgba(0,0,0,.12) 0 8px 10px -6px; }
+.mt-pane.active { box-shadow: 0 0 0 1.5px var(--color-rust), rgba(0,0,0,.12) 0 20px 25px -5px; }
+.mt-pane-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 5px 7px 5px 10px; color: var(--term-fg); font-size: 11px; cursor: grab; user-select: none; border-bottom: 1px solid rgba(255,255,255,.06); }
+.mt-pane-header:active { cursor: grabbing; }
+.mt-pane-id { display: flex; align-items: center; gap: 6px; min-width: 0; opacity: .82; }
+.mt-pane-ico { display: inline-flex; opacity: .8; }
+.mt-pane-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mt-pane-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--color-dove); flex: none; }
+.mt-pane-dot.busy { background: var(--color-rust); }
+.mt-pane-actions { display: flex; align-items: center; gap: 2px; }
+.mt-pane-btn { display: inline-flex; align-items: center; justify-content: center; border: none; background: none; color: var(--term-fg); opacity: .55; cursor: pointer; padding: 3px; border-radius: 6px; }
+.mt-pane-btn:hover { opacity: 1; background: rgba(255,255,255,.08); }
+/* persistent dim key legend in the pane header; takes the middle, ellipsizes on narrow panes */
+.mt-pane-hint { flex: 1 1 auto; min-width: 0; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: .38; font-size: 10.5px; letter-spacing: .01em; pointer-events: none; }
+.mt-term-well { position: relative; flex: 1 1 0%; min-height: 0; background: var(--term-bg); padding: 10px 12px; overflow: hidden; }
+.mt-term-host { width: 100%; height: 100%; overflow: hidden; }
+/* No .xterm right-gutter. The viewport scrollbar is hidden (width:0 below), so the old 14px
+   reservation only narrowed the display below Claude's wrap-width (causing the right-edge cutoff +
+   a wide empty strip). The well's own 12px horizontal padding is the visual gutter. */
+.mt-term-host .xterm { padding-right: 0; }
+
+/* split dividers (drag to resize) */
+.mt-divider { flex: 0 0 auto; position: relative; z-index: 2; }
+.mt-split.row > .mt-divider { width: 8px; cursor: col-resize; }
+.mt-split.col > .mt-divider { height: 8px; cursor: row-resize; }
+.mt-divider::after { content: ''; position: absolute; background: var(--hairline); border-radius: 2px; transition: background .15s; }
+.mt-split.row > .mt-divider::after { left: 50%; top: 8px; bottom: 8px; width: 2px; transform: translateX(-50%); }
+.mt-split.col > .mt-divider::after { top: 50%; left: 8px; right: 8px; height: 2px; transform: translateY(-50%); }
+.mt-divider:hover::after { background: var(--color-rust); }
+body.mt-pane-dragging { cursor: grabbing; }
+body.mt-pane-dragging * { user-select: none !important; }
+
+/* drop overlay shown while dragging a pane onto another's edge */
+.mt-drop-overlay { position: absolute; z-index: 6; pointer-events: none; background: var(--color-rust); opacity: .22; border: 1.5px solid var(--color-rust); border-radius: 8px; }
+
+/* jump-to-bottom button, per terminal pane (only shown when scrolled up) */
+.mt-term-jump { position: absolute; right: 14px; bottom: 12px; z-index: 4; display: none; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 50%; border: 1px solid rgba(255,255,255,.14); background: rgba(40,42,46,.88); color: var(--term-fg); cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,.35); }
+.mt-term-jump.show { display: inline-flex; }
+.mt-term-jump:hover { background: var(--color-rust); border-color: var(--color-rust); color: #fff; }
+
+/* paste-image preview chip: thumbnail + label near the CLI's input line (top/left set inline,
+   positioned by cursor row — see showImagePasteChip); falls back to bottom-left, opposite the
+   jump button, when cursor geometry isn't available yet. */
+.mt-paste-chip { position: absolute; z-index: 4; display: flex; align-items: center; gap: 8px; max-width: calc(100% - 60px); padding: 6px 8px 6px 6px; border-radius: 10px; border: 1px solid rgba(255,255,255,.14); background: rgba(40,42,46,.92); box-shadow: 0 4px 12px rgba(0,0,0,.35); cursor: pointer; opacity: 0; transform: translateY(6px); transition: opacity .18s ease, transform .18s ease; }
+.mt-paste-chip--fallback { left: 14px; bottom: 12px; }
+.mt-paste-chip.in { opacity: 1; transform: translateY(0); }
+.mt-paste-chip-thumb { width: 32px; height: 32px; border-radius: 6px; object-fit: cover; flex: 0 0 auto; background: rgba(255,255,255,.06); }
+.mt-paste-chip-label { font-size: 11.5px; color: var(--term-fg); opacity: .85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mt-paste-chip-close { flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; border: none; background: transparent; color: var(--term-fg); opacity: .55; cursor: pointer; }
+.mt-paste-chip-close:hover { opacity: 1; background: rgba(255,255,255,.12); }
+/* auto-close after the prompt is sent: the × swaps to a spinner + a progress bar depletes over ~5s */
+.mt-paste-chip--closing { cursor: default; }
+.mt-paste-chip-spin { display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 2px solid rgba(255,255,255,.24); border-top-color: var(--term-cursor); animation: mt-dot-spin .7s linear infinite; }
+.mt-paste-chip-progress { position: absolute; left: 8px; right: 8px; bottom: 3px; height: 2px; border-radius: 2px; overflow: hidden; background: rgba(255,255,255,.14); }
+.mt-paste-chip-progress > span { display: block; height: 100%; width: 0; background: var(--term-cursor); }
+
+/* split menu popover (pick Shell/Mavis + direction) */
+.mt-split-menu { position: fixed; z-index: 60; background: var(--color-pure-white); border: 1px solid var(--hairline); border-radius: 12px; box-shadow: var(--shadow-card); padding: 10px 11px; display: flex; flex-direction: column; gap: 6px; }
+.mt-sm-label { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--color-graphite); }
+.mt-sm-row { display: flex; gap: 6px; align-items: center; }
+.mt-sm-kind { display: inline-flex; align-items: center; gap: 5px; font: inherit; font-size: 12px; padding: 5px 10px; border-radius: var(--radius-pill); border: 1px solid var(--hairline); background: var(--color-pure-white); color: var(--color-graphite); cursor: pointer; }
+.mt-sm-kind.active { border-color: var(--color-rust); color: var(--color-ink); font-weight: 480; }
+.mt-sm-dir-btn { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 30px; border: 1px solid var(--hairline); background: var(--color-pure-white); color: var(--color-graphite); border-radius: 8px; cursor: pointer; }
+.mt-sm-dir-btn:hover { border-color: var(--color-rust); color: var(--color-ink); }
+.mt-sm-proj-wrap { display: flex; flex-direction: column; gap: 4px; }
+.mt-sm-proj-wrap .mt-dd { width: 230px; }
+.mt-sm-proj { font-size: 12px; padding: 6px 9px; }
+
+/* themed custom dropdown (MT.dropdown) — replaces native <select> so the OPEN list follows the
+   active theme (native option-lists are OS-rendered and ignore our CSS). */
+.mt-dd { position: relative; display: block; width: 100%; }
+.mt-dd-trigger { -webkit-appearance: none; appearance: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; text-align: left; cursor: pointer; }
+.mt-dd-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } /* min-width:0 lets a long label ellipsize instead of widening the trigger past the menu/window */
+.mt-dd-chev { flex: none; display: inline-flex; color: var(--color-graphite); transition: transform .15s ease; }
+.mt-dd-trigger[aria-expanded="true"] .mt-dd-chev { transform: rotate(180deg); }
+.mt-dd-pop { position: fixed; z-index: 80; background: var(--color-pure-white); border: 1px solid var(--hairline); border-radius: 10px; box-shadow: var(--shadow-card); padding: 5px; max-height: 320px; overflow-y: auto; opacity: 0; transform: translateY(-4px); transition: opacity .12s ease, transform .12s ease; }
+.mt-dd-pop.in { opacity: 1; transform: none; }
+.mt-dd-opt { display: block; width: 100%; text-align: left; font: inherit; font-size: 13px; padding: 7px 10px; border: none; background: none; color: var(--color-ink); border-radius: 7px; cursor: pointer; white-space: nowrap; }
+.mt-dd-opt:hover { background: var(--color-fog); }
+.mt-dd-opt.active { background: color-mix(in srgb, var(--color-rust) 12%, transparent); font-weight: 520; }
+
+/* terminal right-click context menu (themed; OS-native menus can't be styled) */
+.mt-ctx-menu { position: fixed; z-index: 1300; min-width: 190px; background: var(--color-pure-white); border: 1px solid var(--hairline); border-radius: 11px; box-shadow: var(--shadow-card); padding: 5px; display: flex; flex-direction: column; gap: 1px; opacity: 0; transform: translateY(-4px); transition: opacity .12s ease, transform .12s ease; }
+.mt-ctx-menu.in { opacity: 1; transform: none; }
+.mt-ctx-item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 7px 9px; border: none; background: none; border-radius: 7px; cursor: pointer; color: var(--color-ink); font: inherit; font-size: 13px; text-align: left; }
+.mt-ctx-item:hover:not(.disabled) { background: var(--color-fog); }
+.mt-ctx-item.disabled { opacity: .4; cursor: default; }
+.mt-ctx-ico { display: inline-flex; align-items: center; justify-content: center; width: 16px; flex: none; color: var(--color-graphite); }
+.mt-ctx-label { flex: 1; min-width: 0; white-space: nowrap; }
+.mt-ctx-accel { color: var(--color-dove); font-size: 11px; letter-spacing: .02em; flex: none; }
+.mt-ctx-sep { height: 1px; background: var(--hairline); margin: 4px 2px; }
+
+/* in-app toast stack (request-complete when the window is visible) */
+/* below the 46px frameless titlebar so it never covers the min/max/close controls; the host
+   itself is click-through (only the toast cards take pointer events). */
+.mt-toast-host { position: fixed; top: 54px; right: 14px; z-index: 80; display: flex; flex-direction: column; gap: 10px; max-width: 340px; pointer-events: none; }
+.mt-toast-host .mt-toast { pointer-events: auto; }
+.mt-toast { display: flex; gap: 10px; align-items: flex-start; background: var(--color-pure-white); border: 1px solid var(--hairline); border-left: 3px solid var(--color-rust); border-radius: 12px; box-shadow: var(--shadow-card); padding: 11px 12px; opacity: 0; transform: translateX(14px); transition: opacity .2s ease, transform .2s ease; }
+.mt-toast.in { opacity: 1; transform: none; }
+.mt-toast.out { opacity: 0; transform: translateX(14px); }
+.mt-toast-ico { color: var(--color-rust); flex: none; margin-top: 1px; display: inline-flex; }
+.mt-toast-main { min-width: 0; flex: 1 1 auto; }
+.mt-toast-title { font-size: 13px; font-weight: 560; color: var(--color-ink); }
+.mt-toast-body { font-size: 12px; color: var(--color-graphite); margin-top: 2px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; word-break: break-word; }
+.mt-toast-close { border: none; background: none; color: var(--color-dove); cursor: pointer; font-size: 15px; line-height: 1; padding: 0 2px; flex: none; }
+.mt-toast-close:hover { color: var(--color-ink); }
+
+/* project colour swatch + picker (projects cards) */
+.mt-swatch { width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid var(--color-dove); background: transparent; cursor: pointer; flex: none; padding: 0; }
+.mt-swatch.set { border-color: rgba(0,0,0,.12); }
+.mt-swatch:hover { box-shadow: 0 0 0 3px var(--color-fog); }
+.mt-swatch-pop { position: fixed; z-index: 60; background: var(--color-pure-white); border: 1px solid var(--hairline); border-radius: 12px; box-shadow: var(--shadow-card); padding: 10px; display: grid; grid-template-columns: repeat(6, 22px); gap: 8px; }
+.mt-swatch-opt { width: 22px; height: 22px; border-radius: 50%; border: 1px solid rgba(0,0,0,.1); cursor: pointer; padding: 0; }
+.mt-swatch-opt.none { background: var(--color-fog); display: inline-flex; align-items: center; justify-content: center; color: var(--color-graphite); }
+.mt-swatch-opt.active { box-shadow: 0 0 0 2px var(--color-ink); }
+
+/* slim dark scrollbar inside terminals (keeps the last column off the gutter) */
+/* hide the terminal scrollbar — it overlaps the last column (the right-edge cutoff) and xterm's
+   FitAddon doesn't reserve our custom webkit bar's width. Wheel-scroll + the jump-to-bottom button
+   still work; the safety column in fitPane covers the rest. */
+.mt-term-host .xterm-viewport::-webkit-scrollbar { width: 0; }
+.mt-term-host .xterm-viewport::-webkit-scrollbar-thumb { background: rgba(255,255,255,.16); border-radius: 6px; }
+.mt-term-host .xterm-viewport::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,.28); }
+
+/* command palette */
+.mt-palette-overlay { position: fixed; inset: 0; background: rgba(23,25,28,.28); display: flex; align-items: flex-start; justify-content: center; padding-top: 12vh; z-index: 50; }
+.mt-palette { width: min(560px, 86vw); background: var(--color-pure-white); border-radius: var(--radius-inputs); box-shadow: var(--shadow-card); overflow: hidden; }
+.mt-palette-input { width: 100%; border: none; outline: none; background: none; padding: 16px 18px; font: inherit; font-size: 16px; color: var(--color-ink); border-bottom: 1px solid var(--hairline); }
+.mt-palette-input::placeholder { color: var(--color-dove); }
+.mt-palette-list { max-height: 320px; overflow-y: auto; }
+.mt-palette-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 18px; cursor: pointer; font-size: 14px; }
+.mt-palette-row .path { color: var(--color-graphite); font-family: var(--font-mono); font-size: 12px; }
+.mt-palette-row.active .path { color: var(--color-ash); }
+.mt-palette-row.active { background: var(--color-apricot-wash); border-left: 1px solid var(--color-rust); }
+
+/* icons */
+.mt-nav-ico { display: inline-flex; align-items: center; color: var(--color-graphite); flex: none; }
+.mt-nav.active .mt-nav-ico { color: var(--color-rust); }
+.mt-wc-btn svg { width: 15px; height: 15px; }
+.mt-kbar svg, .mt-search svg { color: var(--color-graphite); flex: none; }
+.mt-proj-ico { display: inline-flex; align-items: center; color: var(--color-graphite); flex: none; }
+
+/* filter chips (subtle — not CTAs) */
+.mt-filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 18px; }
+.mt-filter { font-family: inherit; font-size: 13px; padding: 5px 13px; border-radius: var(--radius-pill); border: 1px solid var(--hairline); background: var(--color-pure-white); color: var(--color-graphite); cursor: pointer; }
+.mt-filter:hover { color: var(--color-ink); }
+.mt-filter.active { border-color: var(--color-rust); color: var(--color-ink); font-weight: 480; }
+
+/* clickable rows (dashboard "jump back in") */
+.mt-row-click { cursor: pointer; border-radius: 10px; margin: 0 -10px; padding: 10px; }
+.mt-row-click:hover { background: var(--color-fog); }
+
+/* tab activity dot (session-ux) — tinted by the project colour via --dot when set;
+   filled = busy, hollow ring = idle, glow = needs attention. */
+/* .mt-tab-dot is now a status-ICON container styled in topbar.css (spinner/check/question); the old
+   circle rules moved there. The pulse keyframe stays here (reused by topbar.css's .attention glow). */
+@keyframes mt-tabdot-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .28; } }
+
+/* settings form (session-ux) */
+.mt-settings-form { display: grid; gap: 16px; }
+.mt-field { display: flex; flex-direction: column; gap: 6px; }
+.mt-field-label { font-size: 13px; color: var(--color-ash); font-weight: 450; display: flex; align-items: center; gap: 8px; }
+.mt-field-tag { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--color-graphite); border: 1px solid var(--hairline); border-radius: 9999px; padding: 1px 7px; }
+.mt-field-input { font: inherit; font-size: 14px; color: var(--color-ink); background: var(--color-fog); border: 1px solid var(--hairline); border-radius: var(--radius-inputs); padding: 8px 12px; outline: none; }
+.mt-field-input:focus-visible { border-color: var(--color-rust); }
+/* DailyOps off-days — 7 toggle chips (Mon→Sun) */
+.mt-weekdays { display: flex; flex-wrap: wrap; gap: 6px; }
+.mt-weekday { font: inherit; font-size: 12.5px; color: var(--color-graphite); background: var(--color-fog); border: 1px solid var(--hairline); border-radius: var(--radius-pill); padding: 5px 12px; cursor: pointer; min-width: 46px; }
+.mt-weekday:hover { border-color: var(--color-dove); }
+.mt-weekday.on { background: var(--color-apricot-wash); border-color: var(--color-rust); color: var(--color-rust); font-weight: 500; }
+.mt-weekday:focus-visible { outline: 2px solid var(--color-rust); outline-offset: 1px; }
+.mt-term-well.light { background: #ffffff; }
+
+/* info button — secondary affordance on cards/rows (brain-panels) */
+.mt-info-btn { display: inline-flex; align-items: center; justify-content: center; border: none; background: none; cursor: pointer; color: var(--color-dove); padding: 2px; border-radius: 8px; flex: none; }
+.mt-info-btn:hover { color: var(--color-rust); background: var(--color-fog); }
+
+/* detail view (brain-panels) */
+.mt-detail-head { margin-bottom: 16px; }
+.mt-detail-meta { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 8px; color: var(--color-graphite); font-size: 13px; align-items: center; }
+.mt-detail-path { font-family: var(--font-mono); font-size: 12px; color: var(--color-graphite); }
+.mt-detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 900px) { .mt-detail-grid { grid-template-columns: 1fr; } }
+.mt-checkpoint { padding: 8px 0; }
+.mt-checkpoint + .mt-checkpoint { border-top: 1px solid var(--hairline-soft); }
+.mt-checkpoint-when { font-size: 11px; color: var(--color-graphite); font-family: var(--font-mono); }
+.mt-checkpoint-text { font-size: 13px; color: var(--color-ash); margin-top: 2px; }
+
+/* search results (brain-panels) */
+.mt-search-group { font-size: 11px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; color: var(--color-graphite); padding: 10px 18px 4px; }
+.mt-search-snip { color: var(--color-ash); overflow: hidden; text-overflow: ellipsis; }
+.mt-palette-row mark { background: var(--color-apricot-wash); color: var(--color-rust); border-radius: 3px; padding: 0 1px; }
+
+/* integrations: map */
+.mt-map-frame { height: 70vh; border-radius: var(--radius-cards); overflow: hidden; border: 1px solid var(--hairline); background: var(--color-pure-white); }
+
+/* DailyOps — standups history (left) + floating Claude generator (right) */
+.mt-dailyops-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 18px; align-items: start; margin-top: 22px; }
+@media (max-width: 1100px) { .mt-dailyops-layout { grid-template-columns: 1fr; } .mt-do-form { position: static; max-height: none; } }
+.mt-dailyops-history { min-width: 0; }
+.mt-do-list { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
+.mt-do-entry { padding: 14px 18px; }
+.mt-do-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.mt-do-date { font-size: 13px; font-weight: 480; color: var(--color-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mt-do-block { font-family: var(--font-mono); font-size: 12.5px; line-height: 1.5; color: var(--color-ash); background: var(--color-fog); border-radius: 12px; padding: 14px 16px; white-space: pre-wrap; word-break: break-word; overflow-x: auto; margin: 0; }
+
+/* floating generator panel — sticky beside the (long) history, but capped to the viewport with an
+   internally-scrolling body so a long saved standup is fully reachable. A sticky element taller than
+   the viewport pins its top and leaves its bottom unscrollable; the cap + body overflow fixes that. */
+.mt-do-form { padding: 22px; position: sticky; top: 16px; max-height: calc(100vh - 86px); display: flex; flex-direction: column; }
+.mt-do-date2 { font-family: var(--font-mono); font-size: 12px; color: var(--color-graphite); margin-top: 2px; }
+.mt-do-panel-body { margin-top: 16px; flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+.mt-do-hint { font-size: 13px; color: var(--color-ash); margin-bottom: 14px; }
+.mt-do-detail-toggle { display: flex; margin: -4px 0 12px; }
+.mt-do-note { font-size: 13px; color: var(--color-ash); background: var(--color-fog); border-radius: 12px; padding: 10px 12px; margin-bottom: 14px; }
+.mt-do-form-actions { display: flex; align-items: center; gap: 12px; margin-top: 16px; flex-wrap: wrap; }
+.mt-do-form-status { color: var(--color-graphite); font-size: 13px; }
+
+/* generating — staged step loader (each phase fades up; current one spins) */
+.mt-do-steps { display: flex; flex-direction: column; gap: 12px; padding: 12px 0; }
+.mt-do-step { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--color-ash); opacity: 0; transform: translateY(9px); transition: opacity .34s ease, transform .34s ease; }
+.mt-do-step.in { opacity: 1; transform: none; }
+.mt-do-step.done { color: var(--color-graphite); }
+.mt-do-step-ico { width: 16px; height: 16px; display: inline-flex; align-items: center; justify-content: center; flex: none; color: var(--color-rust); font-size: 13px; line-height: 1; }
+.mt-do-spinner { width: 15px; height: 15px; border-radius: 50%; border: 2px solid var(--hairline); border-top-color: var(--color-rust); display: inline-block; animation: mt-spin .7s linear infinite; flex: none; }
+@keyframes mt-spin { to { transform: rotate(360deg); } }
+
+/* question cards */
+.mt-do-qs { display: flex; flex-direction: column; gap: 14px; }
+.mt-do-q { border: 1px solid var(--hairline); border-radius: var(--radius-inputs); padding: 14px 16px; background: var(--color-fog); }
+.mt-do-q-label { font-size: 13px; font-weight: 460; color: var(--color-ink); margin-bottom: 10px; }
+.mt-do-q-opts { display: flex; flex-direction: column; gap: 8px; }
+.mt-do-opt { display: flex; align-items: center; gap: 9px; font-size: 14px; color: var(--color-ash); cursor: pointer; }
+.mt-do-opt input { accent-color: var(--color-rust); width: 15px; height: 15px; }
+.mt-do-q-text { width: 100%; background: var(--color-pure-white); resize: vertical; min-height: 44px; line-height: 1.5; font-family: inherit; }
+
+/* review / manual edit + error */
+.mt-do-review { width: 100%; font-family: var(--font-mono); font-size: 12.5px; line-height: 1.5; resize: vertical; min-height: 280px; background: var(--color-fog); }
+.mt-do-error { font-size: 13px; color: var(--color-rust); white-space: pre-wrap; }
+
+/* ---------- PM: board toolbar (project picker + "only mine" switch) ---------- */
+.mt-pm-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 18px 0 4px; flex-wrap: wrap; }
+.mt-pm-pickers { display: flex; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.mt-pm-count { opacity: .5; font-variant-numeric: tabular-nums; }
+.mt-switch { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; border: none; background: none; font-family: inherit; padding: 4px 2px; flex: none; }
+.mt-switch-track { width: 24px; height: 14px; border-radius: 9999px; border: 1px solid var(--hairline); background: var(--color-fog); position: relative; transition: background .15s, border-color .15s; flex: none; }
+.mt-switch-thumb { position: absolute; top: 1px; left: 1px; width: 10px; height: 10px; border-radius: 50%; background: var(--color-dove); transition: transform .15s, background .15s; }
+/* on-state uses the warm Apricot wash as an active-control fill — same exception
+   the active command-palette row (.mt-palette-row.active) already makes; rust is
+   still the only true accent (border + thumb). */
+.mt-switch.on .mt-switch-track { border-color: var(--color-rust); background: var(--color-apricot-wash); }
+.mt-switch.on .mt-switch-thumb { transform: translateX(10px); background: var(--color-rust); }
+.mt-switch-label { font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--color-graphite); }
+
+/* ---------- PM: Kanban board ---------- */
+.mt-kanban { display: flex; gap: 14px; align-items: flex-start; margin-top: 22px; }
+.mt-kan-col { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; }
+.mt-kan-head { display: flex; align-items: center; gap: 8px; padding: 0 4px 10px; }
+.mt-kan-title { font-size: 11px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; color: var(--color-graphite); }
+.mt-kan-count { font-size: 11px; color: var(--color-dove); font-family: var(--font-mono); }
+.mt-kan-body { display: flex; flex-direction: column; gap: 10px; }
+.mt-kan-card { padding: 13px 15px; cursor: pointer; box-shadow: var(--shadow-soft); }
+.mt-kan-card:hover { box-shadow: 0 0 0 1.5px var(--color-rust), rgba(0,0,0,.08) 0 14px 20px -8px; }
+.mt-kan-card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.mt-kan-card-top .mt-type-pill { flex: none; }
+.mt-kan-card-title { font-size: 14px; font-weight: 460; line-height: 1.35; color: var(--color-ink); min-width: 0; }
+.mt-kan-card .mt-row-sub { margin-top: 6px; }
+.mt-kan-assignee { font-size: 11px; color: var(--color-graphite); margin-top: 7px; display: flex; align-items: center; gap: 5px; }
+.mt-kan-assignee::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: var(--color-dove); flex: none; }
+.mt-kan-empty { font-size: 13px; color: var(--color-dove); padding: 14px 4px; }
+
+/* status chip (chrome — a tiny meaningful dot + a text label; not a wash).
+   On-palette progression: todo = dove (light/not-started), doing = rust (the one
+   accent, in-progress), done = ink (solid/complete). Status is conveyed by text
+   too, so the dot is never the sole signal. */
+.mt-status-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--color-graphite); background: var(--color-fog); border-radius: var(--radius-pill); padding: 2px 10px 2px 8px; }
+.mt-status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--color-dove); flex: none; }
+.mt-status-dot.s-doing { background: var(--color-rust); }
+.mt-status-dot.s-done { background: var(--color-ink); }
+
+/* ---------- PM: task detail sheet (right slide-in) ---------- */
+.mt-sheet-overlay { position: fixed; inset: 0; z-index: 60; display: flex; justify-content: flex-end; background: rgba(23,25,28,0); transition: background .2s ease; }
+.mt-sheet-overlay.in { background: rgba(23,25,28,.28); }
+.mt-sheet { width: min(560px, 92vw); height: 100%; background: var(--color-pure-white); box-shadow: rgba(0,0,0,.18) -8px 0 30px -10px; display: flex; flex-direction: column; transform: translateX(100%); transition: transform .22s cubic-bezier(.22,.61,.36,1); }
+.mt-sheet-overlay.in .mt-sheet { transform: none; }
+.mt-sheet-head { padding: 20px 22px 16px; border-bottom: 1px solid var(--hairline); flex: none; }
+.mt-sheet-toprow { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+.mt-sheet-chips { display: flex; align-items: center; gap: 8px; min-width: 0; flex-wrap: wrap; }
+.mt-sheet-actions { display: flex; align-items: center; gap: 6px; flex: none; }
+.mt-sheet-startwork { display: inline-flex; align-items: center; gap: 6px; background: var(--btn-bg); color: var(--btn-fg); border: none; border-radius: var(--radius-pill); padding: 5px 12px 5px 10px; font-size: 12.5px; font-weight: 450; cursor: pointer; font-family: inherit; }
+.mt-sheet-startwork:hover { opacity: .92; }
+.mt-sheet-startwork svg { width: 14px; height: 14px; flex: none; }
+.mt-icon-btn { width: 30px; height: 30px; border: none; background: none; cursor: pointer; color: var(--color-graphite); border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; }
+.mt-icon-btn:hover { background: var(--color-fog); color: var(--color-ink); }
+.mt-sheet-title { font-size: 20px; font-weight: 500; line-height: 1.25; letter-spacing: -0.01em; color: var(--color-ink); }
+.mt-sheet-meta { font-size: 13px; color: var(--color-graphite); margin-top: 6px; }
+.mt-sheet-body { flex: 1; overflow-y: auto; padding: 18px 22px 28px; }
+.mt-sheet-section { margin-top: 24px; }
+.mt-sheet-body > .mt-sheet-section:first-child { margin-top: 4px; }
+.mt-sheet-sec-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.mt-sheet-sec-count { font-size: 12px; color: var(--color-graphite); font-family: var(--font-mono); }
+.mt-sheet-prose { font-size: 14px; line-height: 1.55; color: var(--color-ash); white-space: pre-wrap; word-break: break-word; }
+
+/* rich text (TipTap doc JSON rendered to DOM) */
+.mt-prose { font-size: 14px; line-height: 1.55; color: var(--color-ash); word-break: break-word; }
+.mt-prose-p { margin: 0 0 8px; }
+.mt-prose-p:last-child { margin-bottom: 0; }
+.mt-prose-p:empty { min-height: 7px; }
+.mt-prose-h { font-weight: 600; color: var(--color-ink); margin: 12px 0 6px; }
+.mt-prose-list { margin: 4px 0 8px; padding-left: 20px; }
+.mt-prose-list li { margin: 2px 0; }
+.mt-prose strong { font-weight: 600; color: var(--color-ink); }
+.mt-prose code { font-family: var(--font-mono); font-size: 12.5px; background: var(--color-fog); padding: 1px 5px; border-radius: 5px; }
+.mt-prose-code { font-family: var(--font-mono); font-size: 12.5px; background: var(--color-fog); padding: 10px 12px; border-radius: 10px; white-space: pre-wrap; margin: 6px 0; color: var(--color-ash); }
+.mt-prose-quote { border-left: 2px solid var(--hairline); padding-left: 12px; color: var(--color-graphite); margin: 6px 0; }
+.mt-prose-img { display: inline-block; font-size: 12px; color: var(--color-graphite); font-style: italic; }
+.mt-prose-figure { margin: 10px 0; }
+.mt-prose-img-real { max-width: 100%; height: auto; border-radius: 10px; border: 1px solid var(--hairline); display: block; cursor: zoom-in; }
+.mt-prose-img-real:hover { border-color: var(--color-rust); }
+.mt-prose-link { color: var(--color-rust); }
+
+/* ---------- image lightbox (zoom / pan) ---------- */
+.mt-lb-overlay { position: fixed; inset: 0; z-index: 80; overflow: hidden; cursor: grab; background: rgba(10,11,13,0); opacity: 0; transition: opacity .18s ease, background .18s ease; }
+.mt-lb-overlay.in { opacity: 1; background: rgba(10,11,13,.88); }
+.mt-lb-overlay.grabbing { cursor: grabbing; }
+.mt-lb-stage { position: absolute; inset: 0; }
+.mt-lb-img { position: absolute; top: 0; left: 0; transform-origin: 0 0; max-width: none; user-select: none; -webkit-user-drag: none; will-change: transform; }
+.mt-lb-bar { position: absolute; bottom: 22px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 2px; background: rgba(23,25,28,.86); border: 1px solid rgba(255,255,255,.10); border-radius: var(--radius-pill); padding: 4px 6px; z-index: 2; }
+.mt-lb-btn { width: 32px; height: 30px; border: none; background: none; color: #d8d2c8; cursor: pointer; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; }
+.mt-lb-btn:hover { background: rgba(255,255,255,.12); color: #fff; }
+.mt-lb-pct { color: #b8b2a8; font-family: var(--font-mono); font-size: 12px; min-width: 46px; text-align: center; user-select: none; }
+.mt-lb-close { position: absolute; top: 18px; right: 18px; width: 38px; height: 38px; border: none; background: rgba(23,25,28,.86); color: #d8d2c8; border-radius: 50%; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; z-index: 2; }
+.mt-lb-close:hover { background: rgba(255,255,255,.16); color: #fff; }
+@media (prefers-reduced-motion: reduce) { .mt-lb-overlay { transition: none; } }
+
+/* ---------- Ask Mavis (FAB chat) ---------- */
+.mt-bc-fab { position: fixed; right: 22px; bottom: 22px; z-index: 56; width: 54px; height: 54px; border-radius: 50%; border: none; cursor: pointer; background: var(--color-pure-white); box-shadow: rgba(0,0,0,.18) 0 8px 24px -6px, rgba(4,23,43,.06) 0 0 0 1px; padding: 0; display: flex; align-items: center; justify-content: center; transition: transform .15s ease, box-shadow .15s ease; }
+.mt-bc-fab:hover { transform: translateY(-2px); box-shadow: rgba(0,0,0,.24) 0 12px 28px -6px, rgba(4,23,43,.06) 0 0 0 1px; }
+.mt-bc-fab.active { box-shadow: 0 0 0 2px var(--color-rust), rgba(0,0,0,.2) 0 10px 26px -6px; }
+.mt-bc-fab-logo { width: 38px; height: 38px; border-radius: 50%; object-fit: cover; object-position: center top; }
+.mt-bc-panel { position: fixed; right: 22px; bottom: 86px; z-index: 55; width: min(400px, calc(100vw - 44px)); height: min(560px, calc(100vh - 130px)); background: var(--color-pure-white); border-radius: 20px; box-shadow: var(--shadow-card); display: flex; flex-direction: column; overflow: hidden; opacity: 0; visibility: hidden; pointer-events: none; transform: translateY(12px) scale(.98); transform-origin: bottom right; transition: opacity .2s ease, transform .2s cubic-bezier(.2,.7,.2,1), visibility .2s; }
+.mt-bc-panel.open { opacity: 1; visibility: visible; pointer-events: auto; transform: none; }
+/* Ask Mavis as a router VIEW (replaces the floating panel): a centered chat card that fills the
+   view-host height so the composer pins to the bottom and the messages scroll internally. */
+.mt-bc-view { display: flex; flex-direction: column; height: 100%; min-height: 0; width: 100%; background: var(--color-pure-white); border: 1px solid var(--hairline); border-radius: 18px; overflow: hidden; box-shadow: var(--shadow-card); }
+.mt-bc-head { display: flex; align-items: center; gap: 10px; padding: 13px 12px 13px 16px; border-bottom: 1px solid var(--hairline); flex: none; }
+.mt-bc-title { display: flex; align-items: center; gap: 9px; font-size: 15px; font-weight: 500; flex: none; }
+.mt-bc-head-logo { width: 22px; height: 22px; border-radius: 50%; object-fit: cover; object-position: center top; }
+.mt-bc-status { flex: 1; font-size: 11px; color: var(--color-graphite); font-family: var(--font-mono); }
+.mt-bc-head-right { display: flex; align-items: center; gap: 4px; flex: none; }
+.mt-bc-end { font-size: 12px; color: var(--color-rust); background: none; border: 1px solid var(--hairline); border-radius: var(--radius-pill); padding: 3px 11px; cursor: pointer; font-family: inherit; }
+.mt-bc-end:hover { border-color: var(--color-rust); background: var(--color-fog); }
+.mt-bc-msgs { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.mt-bc-empty { margin: auto; text-align: center; padding: 24px 8px; }
+.mt-bc-empty-title { font-family: var(--font-signifier); font-size: 26px; color: var(--color-ink); }
+.mt-bc-empty-sub { font-size: 13px; color: var(--color-graphite); margin-top: 8px; line-height: 1.5; }
+.mt-bc-msg { display: flex; }
+.mt-bc-user { justify-content: flex-end; }
+.mt-bc-bubble { max-width: 86%; font-size: 14px; line-height: 1.5; border-radius: 16px; padding: 9px 13px; word-break: break-word; }
+.mt-bc-user .mt-bc-bubble { background: var(--btn-bg); color: var(--btn-fg); border-bottom-right-radius: 5px; }
+.mt-bc-assistant .mt-bc-bubble { background: var(--color-fog); color: var(--color-ash); border-bottom-left-radius: 5px; max-width: 100%; }
+.mt-bc-error .mt-bc-bubble { background: #f7e9e4; color: var(--color-rust); }
+.mt-bc-md > * { margin: 8px 0 0; }
+.mt-bc-md > :first-child { margin-top: 0; }
+.mt-bc-p { white-space: pre-wrap; }
+.mt-bc-h { font-weight: 600; color: var(--color-ink); font-size: 14px; }
+.mt-bc-list { padding-left: 20px; }
+.mt-bc-list li { margin: 3px 0; }
+.mt-bc-md strong { font-weight: 600; color: var(--color-ink); }
+.mt-bc-md em { font-style: italic; }
+.mt-bc-md code { font-family: var(--font-mono); font-size: 12px; background: rgba(0,0,0,.06); border-radius: 5px; padding: 1px 5px; }
+.mt-bc-code { font-family: var(--font-mono); font-size: 12px; background: rgba(0,0,0,.06); border-radius: 8px; padding: 9px 11px; white-space: pre-wrap; overflow-x: auto; color: var(--color-ash); }
+.mt-bc-think { color: var(--color-graphite); font-style: italic; }
+.mt-do-steps.mt-bc-steps { padding: 2px 0; gap: 9px; }
+.mt-bc-steps .mt-do-step { font-size: 13.5px; }
+.mt-bc-composer { display: flex; align-items: flex-end; gap: 8px; padding: 12px; border-top: 1px solid var(--hairline); flex: none; }
+.mt-bc-input { flex: 1; resize: none; border: 1px solid var(--hairline); border-radius: 14px; padding: 9px 12px; font: inherit; font-size: 14px; color: var(--color-ink); background: var(--color-fog); outline: none; max-height: 120px; line-height: 1.4; }
+.mt-bc-input:focus-visible { border-color: var(--color-rust); outline: none; }
+.mt-bc-send { width: 38px; height: 38px; flex: none; border: none; border-radius: 50%; background: var(--btn-bg); color: var(--btn-fg); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+.mt-bc-send:hover { opacity: .92; }
+.mt-bc-send:disabled { opacity: .4; cursor: default; }
+@media (prefers-reduced-motion: reduce) { .mt-bc-fab { transition: none; } }
+
+/* ---------- daily-log + topics (two-pane: rail + content) ---------- */
+.mt-dl-layout { display: grid; grid-template-columns: 264px minmax(0, 1fr); gap: 20px; align-items: start; margin-top: 18px; }
+@media (max-width: 900px) { .mt-dl-layout { grid-template-columns: 1fr; } }
+.mt-dl-rail { position: sticky; top: 0; max-height: calc(100vh - 172px); overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 2px; }
+.mt-dl-date { background: var(--color-pure-white); border-radius: 14px; box-shadow: var(--shadow-soft); padding: 11px 14px; cursor: pointer; border: 1px solid transparent; }
+.mt-dl-date:hover { box-shadow: 0 0 0 1.5px var(--color-rust), rgba(0,0,0,.06) 0 8px 14px -6px; }
+.mt-dl-date.active { border-color: var(--color-rust); box-shadow: 0 0 0 1.5px var(--color-rust); }
+.mt-dl-date-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.mt-dl-date-label { font-size: 13.5px; font-weight: 480; color: var(--color-ink); }
+.mt-dl-date-count { font-size: 11px; color: var(--color-dove); font-family: var(--font-mono); flex: none; }
+.mt-dl-projs { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 7px; }
+.mt-dl-proj { font-size: 10.5px; color: var(--color-graphite); background: var(--color-fog); border-radius: var(--radius-pill); padding: 1px 8px; }
+.mt-dl-main { min-width: 0; }
+.mt-dl-day-title { font-family: var(--font-signifier); font-size: 28px; line-height: 1.12; letter-spacing: -0.02em; margin-bottom: 14px; word-break: break-word; }
+
+/* shared markdown (MT.md) */
+.mt-md { font-size: 14px; line-height: 1.6; color: var(--color-ash); word-break: break-word; }
+.mt-md > * { margin: 10px 0 0; }
+.mt-md > :first-child { margin-top: 0; }
+.mt-md-p { white-space: pre-wrap; }
+.mt-md-h { font-weight: 600; color: var(--color-ink); font-size: 15px; margin-top: 18px; }
+.mt-md-list { padding-left: 22px; }
+.mt-md-list li { margin: 3px 0; }
+.mt-md strong { font-weight: 600; color: var(--color-ink); }
+.mt-md em { font-style: italic; }
+.mt-md code { font-family: var(--font-mono); font-size: 12.5px; background: rgba(0,0,0,.05); border-radius: 5px; padding: 1px 5px; }
+.mt-md-code { font-family: var(--font-mono); font-size: 12.5px; background: var(--color-fog); border-radius: 10px; padding: 11px 13px; white-space: pre-wrap; overflow-x: auto; color: var(--color-ash); }
+
+/* topics */
+.mt-topic-item .mt-topic-slug { font-size: 13px; font-weight: 480; color: var(--color-ink); font-family: var(--font-mono); word-break: break-all; }
+.mt-topic-item .mt-topic-did { font-size: 11.5px; color: var(--color-graphite); margin-top: 4px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.mt-topic-triggers { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 16px; }
+.mt-topic-trigger { font-size: 11px; color: var(--color-graphite); background: var(--color-fog); border: 1px solid var(--hairline); border-radius: var(--radius-pill); padding: 2px 9px; }
+.mt-md-hr { border: none; border-top: 1px solid var(--hairline); margin: 14px 0; }
+
+/* ---------- Mavis config (identity / preferences / rules) ---------- */
+.mt-mavis-wrap { margin-top: 20px; display: flex; flex-direction: column; gap: 20px; }
+.mt-mavis-who { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 20px; }
+.mt-mavis-name { font-family: var(--font-signifier); font-size: 30px; line-height: 1; letter-spacing: -0.02em; color: var(--color-ink); }
+.mt-mavis-pronouns { font-size: 13px; color: var(--color-graphite); margin-top: 6px; }
+.mt-mavis-sec-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.mt-mavis-open { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--color-graphite); background: var(--color-pure-white); border: 1px solid var(--hairline); border-radius: var(--radius-pill); padding: 4px 11px 4px 9px; cursor: pointer; font-family: inherit; flex: none; }
+.mt-mavis-open:hover { border-color: var(--color-rust); color: var(--color-rust); }
+.mt-mavis-open svg { width: 13px; height: 13px; flex: none; }
+.mt-mavis-doc { color: var(--color-ash); }
+.mt-sheet-facts { display: flex; flex-wrap: wrap; gap: 9px 18px; padding: 12px 14px; background: var(--color-fog); border-radius: 14px; margin-bottom: 4px; }
+.mt-fact { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.mt-fact-k { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--color-graphite); }
+.mt-fact-v { font-size: 13px; color: var(--color-ash); word-break: break-word; }
+.mt-checklist { display: flex; flex-direction: column; gap: 2px; }
+.mt-check { display: flex; align-items: flex-start; gap: 9px; padding: 5px 0; font-size: 14px; }
+.mt-check-ico { color: var(--color-dove); flex: none; display: inline-flex; }
+.mt-check.done .mt-check-ico { color: var(--color-rust); }
+.mt-check-text { line-height: 1.45; color: var(--color-ash); word-break: break-word; }
+.mt-check.done .mt-check-text { color: var(--color-graphite); text-decoration: line-through; text-decoration-color: var(--color-dove); }
+.mt-comment { padding: 12px 0; border-top: 1px solid var(--hairline-soft); }
+.mt-comment:first-of-type { border-top: none; padding-top: 2px; }
+.mt-comment-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 5px; }
+.mt-comment-author { font-size: 13px; font-weight: 480; color: var(--color-ink); }
+.mt-comment-when { font-size: 11px; color: var(--color-graphite); font-family: var(--font-mono); }
+.mt-source-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.mt-source-title { font-size: 14px; font-weight: 460; color: var(--color-ink); margin-bottom: 6px; }
+
+/* ---------- skeleton (shimmer placeholders) ---------- */
+.mt-skel { background: var(--hairline); border-radius: 7px; position: relative; overflow: hidden; }
+.mt-skel::after { content: ''; position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(90deg, transparent, rgba(255,255,255,.65), transparent); animation: mt-shimmer 1.25s ease-in-out infinite; }
+@keyframes mt-shimmer { 100% { transform: translateX(100%); } }
+.mt-skel-card { background: var(--color-pure-white); border-radius: var(--radius-cards); box-shadow: var(--shadow-soft); }
+@media (prefers-reduced-motion: reduce) {
+  .mt-skel::after { animation: none; }
+  .mt-sheet, .mt-sheet-overlay { transition: none; }
+  .mt-switch-track, .mt-switch-thumb { transition: none; }
+}
+
+/* ---------- boot loader (first-paint splash) ---------- */
+/* Baked into index.html so it's in the FIRST painted frame — the window opens
+   already showing this, never the half-built shell. app.js fades it out once the
+   first view's data has rendered (with a failsafe timeout). */
+.mt-loader {
+  position: fixed; inset: 0; z-index: 1000;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--color-fog);
+  opacity: 1; transition: opacity .42s ease;
+}
+.mt-loader.mt-loader-hide { opacity: 0; pointer-events: none; }
+.mt-loader-inner { display: flex; flex-direction: column; align-items: center; gap: 18px; transform: translateY(-4%); }
+.mt-loader-logo {
+  width: 76px; height: 76px; border-radius: 50%; object-fit: cover; object-position: center top;
+  box-shadow: var(--shadow-card); background: var(--color-pure-white);
+  animation: mt-loader-breathe 2.4s ease-in-out infinite;
+}
+.mt-loader-name { font-family: var(--font-signifier); font-size: 40px; line-height: 1; letter-spacing: -0.025em; color: var(--color-ink); }
+.mt-loader-bar { width: 184px; height: 3px; border-radius: var(--radius-pill); background: var(--hairline); overflow: hidden; }
+.mt-loader-bar > span { display: block; width: 38%; height: 100%; border-radius: inherit; background: var(--color-rust); animation: mt-loader-slide 1.15s ease-in-out infinite; }
+.mt-loader-cap { font-size: 13px; color: var(--color-graphite); letter-spacing: .01em; }
+@keyframes mt-loader-slide { 0% { transform: translateX(-120%); } 100% { transform: translateX(380%); } }
+@keyframes mt-loader-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.045); } }
+@media (prefers-reduced-motion: reduce) {
+  .mt-loader { transition: none; }
+  .mt-loader-logo { animation: none; }
+  .mt-loader-bar > span { animation: none; width: 100%; opacity: .45; }
+}
+
+/* xterm fit helper */
+.xterm, .xterm-viewport { background: transparent !important; }
+
+/* ============================================================
+   APP THEMES — [data-theme] token overrides set on <html>.
+   Every theme is a pure token swap; charts/terminal read their
+   own --chart-* / --term-* vars. Light = :root (no attribute).
+   ============================================================ */
+
+/* titlebar tokens — follow the theme by default; Morflax overrides to a dark nav */
+:root { --titlebar-bg: var(--color-pure-white); --titlebar-fg: var(--color-ink); --titlebar-line: var(--hairline); }
+.mt-titlebar { background: var(--titlebar-bg); border-bottom-color: var(--titlebar-line); }
+.mt-brand-name { color: var(--titlebar-fg); }
+/* .mt-tab colour is owned by topbar.css (per-state: active = --color-ink, inactive dimmed). */
+.mt-wc-btn { color: var(--titlebar-fg); }
+
+[data-theme="sepia"] {
+  --color-ink:#2a2018; --color-pure-white:#faf4e9; --color-fog:#efe6d7; --color-ash:#5a4a3a; --color-graphite:#867254; --color-dove:#b3a48e;
+  --color-rust:#8a3a1e; --color-apricot-wash:#f0d6bf; --color-sky-wash:#e0d6c4; --hairline:#e3d5c0; --hairline-soft:#ece0cf;
+  --shadow-card:rgba(90,60,20,.06) 0 0 0 1px,rgba(80,50,20,.10) 0 20px 25px -5px,rgba(80,50,20,.08) 0 8px 10px -6px;
+  --shadow-soft:rgba(90,60,20,.05) 0 0 0 1px,rgba(80,50,20,.10) 0 4px 10px -6px;
+  --btn-bg:#2a2018; --btn-fg:#faf4e9;
+  --chart-accent:#8a3a1e; --chart-ink:#2a2018; --chart-track:#e3d5c0; --chart-bub1:#9c4423; --chart-bub2:#5e2812;
+  --term-bg:#241c14; --term-fg:#ece0d0; --term-cursor:#c46a3a; --term-sel:#4a3420;
+}
+[data-theme="slate"] {
+  --color-ink:#1a1f26; --color-pure-white:#ffffff; --color-fog:#f3f5f8; --color-ash:#46505c; --color-graphite:#6a7682; --color-dove:#a3acb8;
+  --color-rust:#2f5d8a; --color-apricot-wash:#d9e6f4; --color-sky-wash:#dbe7f5; --hairline:#e6eaef; --hairline-soft:#eef1f5;
+  --shadow-card:rgba(20,40,70,.05) 0 0 0 1px,rgba(0,0,0,.06) 0 20px 25px -5px,rgba(0,0,0,.06) 0 8px 10px -6px;
+  --shadow-soft:rgba(20,40,70,.05) 0 0 0 1px,rgba(0,0,0,.07) 0 4px 10px -6px;
+  --btn-bg:#1a1f26; --btn-fg:#ffffff;
+  --chart-accent:#2f5d8a; --chart-ink:#1a1f26; --chart-track:#dde6ef; --chart-bub1:#3a6ea0; --chart-bub2:#1f4368;
+  --term-bg:#141821; --term-fg:#dfe6ef; --term-cursor:#4f8fce; --term-sel:#243348;
+}
+[data-theme="pine"] {
+  --color-ink:#1c2018; --color-pure-white:#fdfdfb; --color-fog:#f1f3ee; --color-ash:#49503f; --color-graphite:#6b7363; --color-dove:#a6ad9e;
+  --color-rust:#2f5d3a; --color-apricot-wash:#d7e7d7; --color-sky-wash:#dde9dd; --hairline:#e5e8df; --hairline-soft:#eef0e9;
+  --shadow-card:rgba(20,50,20,.05) 0 0 0 1px,rgba(20,40,20,.09) 0 20px 25px -5px,rgba(20,40,20,.07) 0 8px 10px -6px;
+  --shadow-soft:rgba(20,50,20,.05) 0 0 0 1px,rgba(20,40,20,.09) 0 4px 10px -6px;
+  --btn-bg:#1c2018; --btn-fg:#fdfdfb;
+  --chart-accent:#2f5d3a; --chart-ink:#1c2018; --chart-track:#dde7dd; --chart-bub1:#3a7048; --chart-bub2:#1e4028;
+  --term-bg:#141a14; --term-fg:#dde7dd; --term-cursor:#5fa46e; --term-sel:#24402a;
+}
+[data-theme="morflax"] {
+  --color-ink:#171718; --color-pure-white:#ffffff; --color-fog:#f6f6f8; --color-ash:#25282b; --color-graphite:#7c7e83; --color-dove:#a3a7ad;
+  --color-rust:#298ef5; --color-apricot-wash:#e6effd; --color-sky-wash:#e6effd; --hairline:#e5e7eb; --hairline-soft:#eef0f2;
+  --shadow-card:rgba(0,0,0,.04) 0 0 0 1px,rgba(0,0,0,.10) 0 20px 25px -5px,rgba(0,0,0,.08) 0 8px 10px -6px;
+  --shadow-soft:rgba(0,0,0,.04) 0 0 0 1px,rgba(0,0,0,.10) 0 4px 10px -6px;
+  --btn-bg:#298ef5; --btn-fg:#ffffff;
+  --titlebar-bg:#333333; --titlebar-fg:#f3f3f4; --titlebar-line:#454648;
+  --chart-accent:#298ef5; --chart-ink:#171718; --chart-track:#e5e7eb; --chart-bub1:#3a9bf6; --chart-bub2:#1c6dcb;
+  --term-bg:#1a1c20; --term-fg:#e8e8ea; --term-cursor:#5aa0f5; --term-sel:#233246;
+}
+[data-theme="ink"] {
+  --color-ink:#ece6dc; --color-pure-white:#1f2127; --color-fog:#17181c; --color-ash:#b6b1a6; --color-graphite:#8b8f98; --color-dove:#5a5e66;
+  --color-rust:#cc7a52; --color-apricot-wash:#39261a; --color-sky-wash:#24323f; --hairline:#2c2f36; --hairline-soft:#25272d;
+  --shadow-card:rgba(255,255,255,.04) 0 0 0 1px,rgba(0,0,0,.5) 0 20px 25px -5px,rgba(0,0,0,.45) 0 8px 10px -6px;
+  --shadow-soft:rgba(255,255,255,.04) 0 0 0 1px,rgba(0,0,0,.45) 0 4px 10px -6px;
+  --btn-bg:#ece6dc; --btn-fg:#17181c;
+  --chart-accent:#cc7a52; --chart-ink:#ece6dc; --chart-track:#2c2f36; --chart-bub1:#c2754f; --chart-bub2:#7d3a23;
+  --term-bg:#121316; --term-fg:#ece6dc; --term-cursor:#cc7a52; --term-sel:#39261a;
+}
+[data-theme="nocturne"] {
+  --color-ink:#e6e9f0; --color-pure-white:#1b1e27; --color-fog:#12141a; --color-ash:#aab2c0; --color-graphite:#7c8696; --color-dove:#525a68;
+  --color-rust:#6f9fdb; --color-apricot-wash:#23314c; --color-sky-wash:#23314c; --hairline:#282d38; --hairline-soft:#22262f;
+  --shadow-card:rgba(255,255,255,.04) 0 0 0 1px,rgba(0,0,0,.55) 0 20px 25px -5px,rgba(0,0,0,.5) 0 8px 10px -6px;
+  --shadow-soft:rgba(255,255,255,.04) 0 0 0 1px,rgba(0,0,0,.5) 0 4px 10px -6px;
+  --btn-bg:#e6e9f0; --btn-fg:#12141a;
+  --chart-accent:#6f9fdb; --chart-ink:#e6e9f0; --chart-track:#282d38; --chart-bub1:#5a8fd0; --chart-bub2:#2f4f80;
+  --term-bg:#0f1118; --term-fg:#e6e9f0; --term-cursor:#6f9fdb; --term-sel:#23314c;
+}
+[data-theme="xai"] {
+  --color-ink:#ffffff; --color-pure-white:#0f0f0e; --color-fog:#0c0c0b; --color-ash:#a9adb3; --color-graphite:#7d8187; --color-dove:#474747;
+  --color-rust:#ffffff; --color-apricot-wash:#191b1f; --color-sky-wash:#16202e; --hairline:#1f2228; --hairline-soft:#15171b;
+  --shadow-card:rgba(255,255,255,.06) 0 0 0 1px; --shadow-soft:rgba(255,255,255,.05) 0 0 0 1px;
+  --btn-bg:#ffffff; --btn-fg:#0c0c0b;
+  --chart-accent:#ffffff; --chart-ink:#e6e9ee; --chart-track:#1f2228; --chart-bub1:#2b2e34; --chart-bub2:#121316;
+  --term-bg:#0c0c0b; --term-fg:#ffffff; --term-cursor:#2563eb; --term-sel:#1f2228;
+}
+[data-theme="resend"] {
+  --color-ink:#f0f0f0; --color-pure-white:#0b0e14; --color-fog:#000000; --color-ash:#a1a4a5; --color-graphite:#6c6c6c; --color-dove:#464a4d;
+  --color-rust:#3b9eff; --color-apricot-wash:#0e1b33; --color-sky-wash:#0e1b33; --hairline:#292d30; --hairline-soft:#1c2024;
+  --shadow-card:rgba(176,199,217,.12) 0 0 0 1px; --shadow-soft:rgba(176,199,217,.10) 0 0 0 1px;
+  --btn-bg:#f0f0f0; --btn-fg:#000000;
+  --chart-accent:#3b9eff; --chart-ink:#f0f0f0; --chart-track:#292d30; --chart-bub1:#9281f7; --chart-bub2:#6a3fb0;
+  --term-bg:#000000; --term-fg:#f0f0f0; --term-cursor:#3b9eff; --term-sel:#0e1b33;
+}
+/* (xAI amber-horizon glow deferred — it must not override .mt-view-host's absolute fill,
+   which is what makes the scroll container work.) */
+
+/* ============================================================
+   MOTION — premium feel (all tiers). transform/opacity only.
+   ============================================================ */
+@keyframes mt-fade { from { opacity: 0 } to { opacity: 1 } }
+@keyframes mt-rise { from { opacity: 0; transform: translateY(10px) } to { opacity: 1; transform: none } }
+@keyframes mt-pop-in { from { opacity: 0; transform: translateY(-6px) scale(.985) } to { opacity: 1; transform: none } }
+
+/* Tier 1 — view transition: the router adds .mt-view-in to the incoming view */
+.mt-view-in { animation: mt-fade .18s ease both; }
+/* dashboard entrance: hero + tiles + chart cards rise with a light stagger */
+.mt-view-in .mt-tile, .mt-view-in .mt-pulse-card, .mt-view-in .mt-cols-charts > * { animation: mt-rise .3s cubic-bezier(.2,.7,.2,1) both; }
+.mt-view-in .mt-pulse-card { animation-delay:.12s; }
+.mt-view-in .mt-tiles .mt-tile:nth-child(1){ animation-delay:.03s; }
+.mt-view-in .mt-tiles .mt-tile:nth-child(2){ animation-delay:.07s; }
+.mt-view-in .mt-tiles .mt-tile:nth-child(3){ animation-delay:.11s; }
+.mt-view-in .mt-tiles .mt-tile:nth-child(4){ animation-delay:.15s; }
+.mt-view-in .mt-cols-charts > *:nth-child(1){ animation-delay:.16s; }
+.mt-view-in .mt-cols-charts > *:nth-child(2){ animation-delay:.20s; }
+.mt-view-in .mt-cols-charts > *:nth-child(3){ animation-delay:.24s; }
+
+/* Tier 1 — command palette popup */
+.mt-palette-overlay { animation: mt-fade .16s ease both; }
+.mt-palette { animation: mt-pop-in .17s cubic-bezier(.2,.7,.2,1) both; }
+
+/* Tier 1/2 — interactive transitions + press feedback (decisions) */
+.mt-pill, .mt-link, .mt-nav, .mt-tab, .mt-wc-btn, .mt-filter, .mt-switch, .mt-info-btn,
+.mt-icon-btn, .mt-mavis-open, .mt-sheet-startwork, .mt-bc-send, .mt-proj, .mt-kan-card,
+.mt-row-click, .mt-palette-row, .mt-dl-date, .mt-jtab, .mt-jrnl-entry {
+  transition: transform .1s ease, background-color .14s ease, border-color .14s ease, box-shadow .16s ease, color .14s ease;
+}
+.mt-pill:active, .mt-link:active, .mt-nav:active, .mt-tab:active, .mt-wc-btn:active, .mt-filter:active,
+.mt-switch:active, .mt-info-btn:active, .mt-icon-btn:active, .mt-mavis-open:active,
+.mt-sheet-startwork:active, .mt-bc-send:active { transform: scale(.95); }
+.mt-row-click:active, .mt-palette-row:active { transform: scale(.992); }
+
+/* Tier 2 — hover lift on clickable cards (kan-card keeps its own ring) */
+.mt-proj:hover, .mt-dl-date:hover { transform: translateY(-2px); box-shadow: var(--shadow-card); }
+.mt-kan-card:hover { transform: translateY(-2px); }
+.mt-proj:active, .mt-kan-card:active, .mt-dl-date:active { transform: translateY(0) scale(.992); }
+.mt-bc-fab:active { transform: scale(.94); }
+
+/* Tier 3 — theme cross-fade (only while .theming is set on <html>, ~280ms) */
+html.theming, html.theming * {
+  transition: background-color .26s ease, color .26s ease, border-color .26s ease,
+              fill .26s ease, stroke .26s ease, box-shadow .26s ease !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mt-view-in, .mt-view-in *, .mt-palette, .mt-palette-overlay { animation: none !important; }
+  .mt-bc-panel { transition: opacity .12s ease, visibility .12s !important; transform: none !important; }
+  html.theming, html.theming * { transition: none !important; }
+  .mt-pill, .mt-link, .mt-nav, .mt-tab, .mt-wc-btn, .mt-filter, .mt-switch, .mt-info-btn, .mt-icon-btn,
+  .mt-mavis-open, .mt-sheet-startwork, .mt-bc-send, .mt-proj, .mt-kan-card, .mt-row-click, .mt-palette-row, .mt-dl-date, .mt-jtab, .mt-jrnl-entry { transition: none !important; }
+  .mt-pill:active, .mt-proj:hover, .mt-kan-card:hover, .mt-dl-date:hover, .mt-bc-fab:active, .mt-row-click:active, .mt-palette-row:active { transform: none !important; }
+}
+
+/* ============================================================
+   SCROLLBARS — themed (Chromium/Electron). Slim thumb on a
+   transparent track, coloured from --color-dove so it follows
+   the theme everywhere (view-host, sheets, lists, textareas, term).
+   (No scrollbar-width/-color set — that would disable these pseudos.)
+   ============================================================ */
+::-webkit-scrollbar { width: 11px; height: 11px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--color-dove); border-radius: 8px;
+  border: 3px solid transparent; background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--color-graphite); background-clip: padding-box; }
+::-webkit-scrollbar-corner { background: transparent; }
+
+/* ============================================================
+   READING LAYER — rich markdown (md.js) + structured Topics /
+   Daily-log / Preferences readers. All themed via tokens.
+   ============================================================ */
+/* heading hierarchy (md.js emits .mt-md-h + .mt-md-hN) */
+.mt-md-h { font-weight: 600; color: var(--color-ink); margin: 18px 0 6px; }
+.mt-md-h2 { font-family: var(--font-signifier); font-size: 21px; letter-spacing: -.01em; margin-top: 22px; }
+.mt-md-h3 { font-size: 15.5px; margin-top: 18px; }
+.mt-md-h4 { font-size: 12.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--color-graphite); margin-top: 16px; }
+.mt-md-tight .mt-md-h { margin-top: 12px; }
+.mt-md-tight .mt-md-p:first-child { margin-top: 0; }
+/* links + wiki tags + inline code */
+.mt-md-link { color: var(--color-rust); text-decoration: underline; text-decoration-color: var(--color-dove); text-underline-offset: 2px; cursor: pointer; }
+.mt-md-link:hover { text-decoration-color: var(--color-rust); }
+.mt-md-wiki { color: var(--color-rust); background: var(--color-apricot-wash); border-radius: 5px; padding: 0 5px; font-size: .9em; }
+.mt-md-ic { font-family: var(--font-mono); font-size: .88em; background: var(--color-fog); border: 1px solid var(--hairline); border-radius: 4px; padding: 0 4px; }
+.mt-mono { font-family: var(--font-mono); }
+/* tables (CLAUDE.md pointer/lifecycle tables, etc.) */
+.mt-md-table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 13px; }
+.mt-md-table th, .mt-md-table td { border: 1px solid var(--hairline); padding: 6px 10px; text-align: left; vertical-align: top; }
+.mt-md-table th { background: var(--color-fog); font-weight: 560; color: var(--color-ink); }
+/* blockquote */
+.mt-md-quote { border-left: 3px solid var(--color-rust); background: var(--color-fog); border-radius: 0 8px 8px 0; padding: 8px 14px; margin: 10px 0; color: var(--color-ash); }
+/* code token tints — ONLY inside code blocks (honors the colour-in-code-only rule) */
+.mt-tok-kw { color: var(--color-rust); }
+.mt-tok-str { color: #3f8f5a; }
+.mt-tok-com { color: var(--color-dove); font-style: italic; }
+.mt-tok-num { color: #b07a3a; }
+/* collapsible doc sections (Rules, a full daily) */
+.mt-md-sec { border-top: 1px solid var(--hairline); }
+.mt-md-sec:first-of-type { border-top: none; }
+.mt-md-sec-sum { cursor: pointer; list-style: none; font-family: var(--font-signifier); font-size: 20px; letter-spacing: -.01em; color: var(--color-ink); padding: 14px 0 8px; display: flex; align-items: center; gap: 9px; }
+.mt-md-sec-sum::-webkit-details-marker { display: none; }
+.mt-md-sec-sum::before { content: '\25B8'; color: var(--color-dove); font-size: 13px; transition: transform .12s ease; }
+.mt-md-sec[open] > .mt-md-sec-sum::before { transform: rotate(90deg); }
+
+/* topics structured reader */
+.mt-topic-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 2px; }
+.mt-topic-title { font-family: var(--font-signifier); font-size: 30px; letter-spacing: -.02em; }
+.mt-topic-meta { font-family: var(--font-mono); font-size: 11px; color: var(--color-graphite); }
+.mt-sect-lab { font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--color-graphite); margin: 18px 0 8px; }
+.mt-topic-triggers { display: flex; flex-wrap: wrap; gap: 6px; }
+.mt-chip { display: inline-block; font-size: 12px; background: var(--color-fog); border: 1px solid var(--hairline); border-radius: var(--radius-pill); padding: 3px 10px; color: var(--color-ash); }
+.mt-chip.mt-hidden { display: none; }
+.mt-chip-more { cursor: pointer; color: var(--color-rust); font-family: inherit; }
+.mt-topic-did-lead { font-size: 14.5px; color: var(--color-ash); line-height: 1.55; }
+.mt-topic-refs { display: flex; flex-direction: column; gap: 5px; }
+.mt-topic-ref { font-size: 13.5px; color: var(--color-ash); }
+.mt-topic-callout { background: var(--color-apricot-wash); border-radius: 12px; padding: 11px 15px; font-size: 13.5px; line-height: 1.5; color: var(--color-ink); }
+
+/* collapsible fold — topic addenda + (later) preference entries */
+.mt-fold { background: var(--color-pure-white); border-radius: 13px; box-shadow: var(--shadow-soft); margin-top: 10px; overflow: hidden; }
+.mt-fold-head { width: 100%; display: flex; align-items: center; gap: 10px; padding: 12px 15px; cursor: pointer; font-size: 13.5px; font-weight: 500; background: none; border: none; color: var(--color-ink); font-family: inherit; text-align: left; }
+.mt-fold-head:hover { background: var(--color-fog); }
+.mt-fold-date { font-family: var(--font-mono); font-size: 11px; color: var(--color-rust); background: var(--color-apricot-wash); border-radius: var(--radius-pill); padding: 2px 9px; font-weight: 500; flex: none; }
+.mt-fold-title { flex: 1; min-width: 0; }
+.mt-fold-caret { color: var(--color-dove); transition: transform .15s ease; flex: none; }
+.mt-fold.open .mt-fold-caret { transform: rotate(90deg); }
+.mt-fold-body { display: none; padding: 4px 15px 15px; font-size: 13px; color: var(--color-ash); line-height: 1.6; border-top: 1px solid var(--hairline); }
+.mt-fold.open .mt-fold-body { display: block; }
+
+/* ---------- Mavis config: per-category Identity editor + Review diff ---------- */
+.mt-id-group { margin-top: 24px; }
+.mt-id-group-lab { margin: 0 2px 12px; }
+.mt-id-card { background: var(--color-pure-white); border-radius: 16px; box-shadow: var(--shadow-card); padding: 16px 18px; margin-bottom: 12px; }
+.mt-id-card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.mt-id-card-title { font-size: 14.5px; font-weight: 560; color: var(--color-ink); }
+.mt-id-card-body { font-size: 14px; color: var(--color-ash); }
+.mt-id-val { line-height: 1.55; }
+.mt-id-sync { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--color-graphite); font-family: var(--font-mono); margin-top: 10px; }
+.mt-id-sync svg { width: 12px; height: 12px; }
+.mt-pencil { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--color-graphite); border: 1px solid var(--hairline); background: var(--color-pure-white); border-radius: var(--radius-pill); padding: 3px 10px; cursor: pointer; font-family: inherit; flex: none; }
+.mt-pencil:hover { color: var(--color-rust); border-color: var(--color-rust); }
+/* chips editor + read */
+.mt-chips-read, .mt-chips-edit { display: flex; flex-wrap: wrap; gap: 7px; margin: 4px 0; }
+.mt-chip.on { background: var(--color-apricot-wash); border-color: transparent; color: var(--color-rust); font-weight: 500; }
+button.mt-chip { cursor: pointer; font-family: inherit; }
+.mt-chip-add { border-style: dashed; color: var(--color-graphite); cursor: pointer; }
+/* checklist toggles */
+.mt-checks { display: flex; flex-direction: column; gap: 9px; margin: 4px 0; }
+.mt-check { display: flex; align-items: center; gap: 11px; font-size: 14px; color: var(--color-ash); cursor: pointer; }
+.mt-sw { width: 34px; height: 20px; border-radius: 9999px; background: var(--color-dove); position: relative; flex: none; transition: background .15s; }
+.mt-sw.on { background: var(--color-rust); }
+.mt-sw::after { content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: left .15s; }
+.mt-sw.on::after { left: 16px; }
+/* preset select + textarea */
+.mt-preset-row { display: flex; align-items: center; gap: 12px; margin-bottom: 9px; flex-wrap: wrap; }
+.mt-preset-sel { max-width: 280px; }
+.mt-preset-flag { font-size: 11.5px; font-family: var(--font-mono); }
+.mt-preset-flag.matched { color: #3f8f5a; }
+.mt-preset-flag.custom { color: var(--color-rust); }
+/* preferences add composer */
+.mt-pref-form { display: flex; flex-direction: column; gap: 5px; margin: 6px 0 4px; }
+.mt-pref-form .mt-field-label { margin-top: 8px; }
+/* Review diff panel (propose-then-confirm) */
+.mt-review { background: var(--color-pure-white); border-radius: 14px; box-shadow: rgba(93,42,26,.3) 0 0 0 1.5px, var(--shadow-card); padding: 16px 18px; margin-top: 10px; }
+.mt-review-head { font-size: 13.5px; font-weight: 560; color: var(--color-ink); }
+.mt-review-sub { font-size: 12px; color: var(--color-graphite); margin-bottom: 12px; }
+.mt-review-file { font-family: var(--font-mono); font-size: 11px; color: var(--color-graphite); margin: 12px 0 5px; }
+.mt-review-err { font-size: 12.5px; color: var(--color-rust); margin: 8px 0; }
+.mt-diff { font-family: var(--font-mono); font-size: 12px; line-height: 1.55; border: 1px solid var(--hairline); border-radius: 9px; overflow: hidden; }
+.mt-diff > div { padding: 2px 12px; white-space: pre-wrap; word-break: break-word; }
+.mt-diff-ctx { color: var(--color-ash); }
+.mt-diff-del { background: rgba(154,59,46,.13); color: #b14a3b; }
+.mt-diff-add { background: rgba(47,107,67,.14); color: #3f8f5a; }
+
+/* ---------- new project: header button + modal ---------- */
+.mt-proj-headright { display: flex; align-items: center; gap: 12px; }
+.mt-proj-new { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px 7px 11px; }
+.mt-proj-new svg { width: 15px; height: 15px; }
+
+.mt-np-overlay { position: fixed; inset: 0; z-index: 70; background: rgba(23,25,28,.34);
+  display: flex; align-items: flex-start; justify-content: center; padding: 7vh 16px 16px; overflow-y: auto; }
+.mt-np-card { width: 100%; max-width: 540px; background: var(--color-pure-white); border: 1px solid var(--hairline);
+  border-radius: 18px; box-shadow: var(--shadow-card); display: flex; flex-direction: column;
+  animation: mt-np-pop .16s cubic-bezier(.22,.61,.36,1) both; }
+@keyframes mt-np-pop { from { opacity: 0; transform: translateY(8px) scale(.99); } to { opacity: 1; transform: none; } }
+.mt-np-head { display: flex; align-items: center; justify-content: space-between; padding: 18px 20px 12px; }
+.mt-np-title { font-family: var(--font-signifier); font-size: 21px; letter-spacing: -.01em; color: var(--color-ink); }
+.mt-np-x { border: none; background: none; color: var(--color-dove); cursor: pointer; padding: 4px; border-radius: 8px; display: inline-flex; }
+.mt-np-x:hover { color: var(--color-ink); background: var(--color-fog); }
+
+.mt-seg { display: inline-flex; margin: 0 20px 4px; padding: 3px; background: var(--color-fog); border-radius: var(--radius-pill); gap: 2px; align-self: flex-start; }
+.mt-seg-btn { font: inherit; font-size: 13px; padding: 6px 16px; border: none; background: none; color: var(--color-graphite); border-radius: var(--radius-pill); cursor: pointer; }
+.mt-seg-btn.active { background: var(--color-pure-white); color: var(--color-ink); box-shadow: var(--shadow-soft); font-weight: 500; }
+
+.mt-np-body { padding: 14px 20px 6px; display: flex; flex-direction: column; gap: 13px; max-height: 56vh; overflow-y: auto; }
+.mt-np-hint { font-size: 12px; color: var(--color-graphite); margin: -7px 0 0; }
+.mt-np-pathrow { display: flex; align-items: center; gap: 10px; }
+.mt-np-pathrow .mt-field-input { flex: 1; min-width: 0; }
+.mt-np-opts { display: flex; flex-direction: column; gap: 9px; padding: 4px 0 2px; }
+.mt-np-check { display: flex; align-items: center; gap: 9px; font-size: 13.5px; color: var(--color-ash); cursor: pointer; }
+.mt-np-check input { width: 15px; height: 15px; accent-color: var(--color-rust); cursor: pointer; }
+.mt-np-check input:disabled { cursor: not-allowed; opacity: .5; }
+.mt-np-remote { border: 1px solid var(--hairline); border-radius: 13px; background: var(--color-fog); padding: 14px 15px; display: flex; flex-direction: column; gap: 12px; }
+
+.mt-np-planhead { font-size: 13px; font-weight: 500; color: var(--color-ink); }
+.mt-np-plan { display: flex; flex-direction: column; gap: 8px; }
+.mt-np-planline { display: flex; gap: 9px; font-size: 13.5px; color: var(--color-ash); line-height: 1.4; }
+.mt-np-planbul { color: var(--color-rust); flex: none; }
+
+.mt-np-foot { display: flex; align-items: center; gap: 12px; padding: 14px 20px 18px; border-top: 1px solid var(--hairline); margin-top: 6px; }
+.mt-np-foot .mt-pill { margin-left: auto; }
+.mt-np-foot .mt-link + .mt-pill { margin-left: auto; }
+.mt-np-status { font-size: 12.5px; color: var(--color-graphite); }
+.mt-np-status.warn { color: var(--color-rust); }
+
+/* ============================================================
+   JOURNAL shell (Character / Traits / Oaths / Lore / Log) +
+   the live Traits tab. All token-themed → re-skins on every theme.
+   ============================================================ */
+.mt-jrnl-card { margin-top: 18px; overflow: hidden; }
+/* underline tab strip (distinct from the titlebar session pills) */
+.mt-jtabs { display: flex; gap: 4px; padding: 12px 14px 0; border-bottom: 1px solid var(--hairline); }
+.mt-jtab { flex: 1; text-align: center; font: inherit; font-size: 12.5px; color: var(--color-graphite); padding: 9px 4px; border: none; background: none; border-radius: 10px 10px 0 0; cursor: pointer; }
+.mt-jtab:hover { color: var(--color-ink); }
+.mt-jtab.on { color: var(--color-ink); font-weight: 560; background: var(--color-fog); box-shadow: inset 0 -2px 0 var(--color-rust); }
+.mt-jbody { padding: 18px 20px 20px; }
+
+/* placeholder for the not-yet-built tabs */
+.mt-jrnl-ph { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; text-align: center; padding: 56px 20px; color: var(--color-graphite); }
+.mt-jrnl-ph-ico { color: var(--color-dove); display: inline-flex; }
+.mt-jrnl-ph-title { font-family: var(--font-signifier); font-size: 21px; letter-spacing: -.01em; color: var(--color-ink); }
+
+/* Traits — toolbar (scope chips + counts, memory-mode segmented control, search) */
+.mt-jrnl-toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+.mt-jrnl-toolbar .mt-filters { margin: 0; flex: 1 1 auto; }
+.mt-jrnl-toolbar .mt-search { flex: 0 0 200px; }
+/* reuse the shared .mt-seg / .mt-seg-btn pill, but reset new-project's column margin and
+   invert the active segment via the per-theme --btn-bg / --btn-fg pair (re-skins all 9 themes) */
+.mt-jrnl-toolbar .mt-seg { margin: 0; align-self: center; }
+.mt-jrnl-toolbar .mt-seg-btn.active { background: var(--btn-bg); color: var(--btn-fg); box-shadow: none; }
+.mt-filter-count { margin-left: 6px; color: var(--color-dove); font-variant-numeric: tabular-nums; font-size: 12px; }
+.mt-filter.active .mt-filter-count { color: var(--color-rust); }
+
+/* Traits — list + detail split (stacks below the app min width) */
+.mt-jrnl-split { display: grid; grid-template-columns: minmax(0, 40%) minmax(0, 1fr); gap: 16px; align-items: start; }
+.mt-jrnl-list { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.mt-jrnl-entry { background: var(--color-pure-white); border: 1px solid transparent; border-radius: 12px; box-shadow: var(--shadow-soft); padding: 11px 13px; cursor: pointer; }
+.mt-jrnl-entry:hover { box-shadow: 0 0 0 1.5px var(--color-rust), var(--shadow-soft); }
+.mt-jrnl-entry.sel { border-color: var(--color-rust); box-shadow: 0 0 0 1.5px var(--color-rust); }
+.mt-jrnl-entry-top { display: flex; align-items: center; gap: 8px; }
+.mt-jrnl-entry-title { flex: 1; min-width: 0; font-size: 14px; font-weight: 480; color: var(--color-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mt-jrnl-entry-sum { font-size: 12px; color: var(--color-graphite); margin-top: 3px; line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mt-jrnl-entry.superseded { opacity: .6; }                 /* "forgotten" rows read as muted */
+.mt-status-dot.s-active { background: var(--color-rust); } /* active = rust; superseded keeps the default dove */
+
+/* Traits — detail panel (item-tooltip feel on the fog surface) */
+.mt-jrnl-detail { position: sticky; top: 0; min-width: 0; background: var(--color-fog); border-radius: 16px; padding: 18px 20px; }
+.mt-jrnl-detail-title { font-size: 20px; font-weight: 540; line-height: 1.25; letter-spacing: -.01em; color: var(--color-ink); }
+.mt-jrnl-detail .mt-sect-lab { color: var(--color-rust); }   /* RULE / WHY / HOW TO APPLY tinted rust */
+.mt-jrnl-meta-status { display: inline-flex; align-items: center; gap: 6px; }
+.mt-jrnl-detail-links { margin-top: 6px; overflow-wrap: anywhere; }
+.mt-jrnl-detail-links .mt-topic-ref, .mt-jrnl-detail-links .mt-md-link { overflow-wrap: anywhere; word-break: break-word; }
+
+@media (max-width: 900px) {
+  .mt-jrnl-split { grid-template-columns: 1fr; }   /* list, then detail below */
+  .mt-jrnl-detail { position: static; }            /* drop sticky once stacked */
+  .mt-jrnl-toolbar .mt-search { flex: 1 1 100%; }  /* search to its own full-width line */
+}
+
+/* ============================================================
+   CHARACTER tab → compact one-screen hub + drill-down. Mavis
+   card · MCP server slot grid · compact Inventory bags (Identity
+   / Preferences / Rules) · Skills row. No detail panel in the
+   hub — clicking a bag / slot / skill swaps in a breadcrumbed
+   sub-view. Token-only → re-skins on every theme; columns stack
+   < 900px.
+   ============================================================ */
+
+/* Mavis card disc + name + sub-line (disc/name/class reused from the old portrait) */
+.mt-char-disc { width: 72px; height: 72px; flex: none; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  background: var(--color-pure-white); color: var(--color-rust); border: 1px solid var(--hairline);
+  font-family: var(--font-signifier); font-size: 32px; font-weight: 540; }
+.mt-char-name { font-family: var(--font-signifier); font-size: 24px; letter-spacing: -.01em; color: var(--color-ink); }
+.mt-char-class { font-family: var(--font-mono); font-size: 12px; color: var(--color-graphite); margin-top: 3px; text-align: center; }
+/* the Mavis avatar image (assets/mavis-logo.png) — the character portrait */
+.mt-char-portrait { width: 110px; height: 110px; flex: none; border-radius: 50%; object-fit: cover; object-position: center top;
+  background: var(--color-pure-white); border: 2px solid var(--color-rust); box-shadow: var(--shadow-soft); }
+
+/* top grid: Mavis (left) · everything else (right). Left card stretches to the
+   (now short) right column height via align-items: stretch — no dead space. */
+.mt-hub { display: grid; grid-template-columns: minmax(240px, 34%) 1fr; gap: 20px; align-items: stretch; }
+.mt-hub-me { border: 1px solid var(--hairline); border-radius: var(--radius-cards); background: var(--color-apricot-wash);
+  padding: 22px 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; }
+.mt-hub-right { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+.mt-hub-panes { display: grid; grid-template-columns: minmax(0, 300px) 1fr; gap: 20px; align-items: start; }
+.mt-hub-mcp, .mt-hub-inv { min-width: 0; }
+.mt-hub .mt-sect-lab { margin: 0 0 10px; }
+
+/* breadcrumb — "Character › <sub-view>" atop every drill-down */
+.mt-hub-crumb { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; font-size: 13px; }
+.mt-hub-crumb-link { font: inherit; font-size: 13px; color: var(--color-rust); background: none; border: none;
+  padding: 4px 8px; border-radius: 8px; cursor: pointer; }
+.mt-hub-crumb-link:hover { background: var(--color-fog); }
+.mt-hub-crumb-link:focus-visible { outline: 2px solid var(--color-rust); outline-offset: 2px; }
+.mt-hub-crumb-sep { color: var(--color-dove); }
+.mt-hub-crumb-cur { color: var(--color-ink); font-weight: 520; }
+
+/* MCP server slot grid */
+.mt-hub-mcp-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+.mt-hub-empty-note { grid-column: 1 / -1; color: var(--color-dove); font-size: 12.5px; padding: 6px 2px; }
+.mt-hub-slot { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 100%; min-width: 0; font: inherit; cursor: pointer;
+  background: var(--color-fog); border: 1px solid var(--hairline); border-radius: 14px; padding: 12px 10px; }
+.mt-hub-slot:hover { box-shadow: 0 0 0 1.5px var(--color-rust), var(--shadow-soft); }
+.mt-hub-slot.sel { border-color: var(--color-rust); box-shadow: 0 0 0 1.5px var(--color-rust); }
+.mt-hub-slot:focus-visible { outline: 2px solid var(--color-rust); outline-offset: 2px; }
+.mt-hub-slot.empty { border-style: dashed; opacity: .5; cursor: default; pointer-events: none; }
+.mt-hub-slot-ico { width: 30px; height: 30px; flex: none; border-radius: 9px; display: inline-flex; align-items: center; justify-content: center;
+  background: var(--color-pure-white); color: var(--color-rust); border: 1px solid var(--hairline); }
+.mt-hub-slot.sel .mt-hub-slot-ico { color: var(--color-rust); border-color: var(--color-rust); }
+.mt-hub-slot-name { max-width: 100%; font-size: 12px; color: var(--color-graphite); text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Inventory bags — each bag is one compact button: icon · label · count · chevron */
+.mt-hub-bags { display: flex; flex-direction: column; gap: 10px; }
+.mt-hub-bag { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; font: inherit; font-size: 13px; color: var(--color-ink);
+  background: var(--color-pure-white); border: 1px solid var(--hairline); border-radius: 12px; padding: 12px 14px; cursor: pointer; }
+.mt-hub-bag:hover { box-shadow: 0 0 0 1.5px var(--color-rust), var(--shadow-soft); }
+.mt-hub-bag:focus-visible { outline: 2px solid var(--color-rust); outline-offset: 2px; }
+.mt-hub-bag-ico { display: inline-flex; color: var(--color-rust); flex: none; }
+.mt-hub-bag-lab { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mt-hub-bag-ct { margin-left: auto; font-family: var(--font-mono); font-size: 11px; color: var(--color-rust); flex: none; }
+.mt-hub-bag-chev { color: var(--color-dove); font-size: 15px; line-height: 1; flex: none; }
+
+/* Skills row */
+.mt-hub-skills { border: 1px solid var(--hairline); border-radius: 14px; background: var(--color-pure-white); padding: 14px 18px; }
+.mt-hub-skills .mt-sect-lab { margin: 0; }
+.mt-hub-skill-row { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 10px; }
+.mt-hub-skill { display: flex; align-items: center; gap: 9px; font: inherit; cursor: pointer;
+  background: var(--color-fog); border: 1px solid var(--hairline); border-radius: 10px; padding: 9px 11px; }
+.mt-hub-skill:hover { box-shadow: 0 0 0 1.5px var(--color-rust), var(--shadow-soft); }
+.mt-hub-skill.sel { border-color: var(--color-rust); box-shadow: 0 0 0 1.5px var(--color-rust); }
+.mt-hub-skill:focus-visible { outline: 2px solid var(--color-rust); outline-offset: 2px; }
+.mt-hub-skill.empty { border-style: dashed; opacity: .5; color: var(--color-dove); cursor: default; }
+.mt-hub-skill-ico { display: inline-flex; color: var(--color-rust); flex: none; }
+.mt-hub-skill-name { font-size: 11.5px; color: var(--color-ink); }
+
+/* Identity sub-view — facet rows in the list column (reused inside .mt-jrnl-split) */
+.mt-hub-facet { display: block; width: 100%; text-align: left; font: inherit; font-size: 13.5px; color: var(--color-ink);
+  background: var(--color-pure-white); border: 1px solid var(--hairline); border-radius: 10px; padding: 9px 12px; cursor: pointer; }
+.mt-hub-facet:hover { box-shadow: 0 0 0 1.5px var(--color-rust); }
+.mt-hub-facet.sel { border-color: var(--color-rust); box-shadow: 0 0 0 1.5px var(--color-rust); }
+.mt-hub-facet:focus-visible { outline: 2px solid var(--color-rust); outline-offset: 2px; }
+
+@media (max-width: 900px) {
+  .mt-hub { grid-template-columns: 1fr; }
+  .mt-hub-panes { grid-template-columns: 1fr; }
+}
+
+/* ---------- entry editor (Phase 2.4: add/edit/supersede) ---------- */
+.mt-jrnl-add { margin-left: auto; }
+.mt-jrnl-detail-actions { display: flex; gap: 8px; margin-top: 18px; padding-top: 14px; border-top: 1px solid rgba(127, 127, 127, 0.15); }
+.mt-pill.mt-pill-ghost { background: transparent; color: inherit; border: 1px solid rgba(127, 127, 127, 0.35); box-shadow: none; }
+.mt-pill.mt-pill-ghost:hover { background: rgba(127, 127, 127, 0.1); }
+.mt-entry-diff { font-family: var(--font-mono, ui-monospace, monospace); font-size: 12px; line-height: 1.5; max-height: 340px; overflow: auto; background: rgba(127, 127, 127, 0.08); border: 1px solid rgba(127, 127, 127, 0.2); border-radius: 8px; padding: 8px 10px; margin: 6px 0 12px; white-space: pre-wrap; word-break: break-word; }
+.mt-entry-diff .mt-diff-add { color: #2ea043; }
+.mt-entry-diff .mt-diff-del { color: #e5534b; text-decoration: line-through; opacity: 0.85; }
+
+/* ---------- brain health (Dashboard card + nav badge) ---------- */
+/* Severity hues are the one thing here that can't resolve from a steep token: green-means-clean
+   and amber-means-warn have none, and rust is the accent, not a status. Same call changes.css:2-6
+   made for the diff tints, so these follow that file's shape — light hexes here, RETUNED for the
+   four dark themes at the foot of this block (a light hex on --color-pure-white:#0f0f0e is
+   unreadable). The washes are the light tier only; the dark tier uses rgba overlays so one pair
+   composites correctly over backgrounds spanning #1f2127 to #000. */
+:root {
+  --bh-ok: #2f7a43; --bh-ok-bg: #e7f4ea;
+  --bh-warn: #8a6d1f; --bh-warn-bg: #f7efd9;
+  --bh-fail: #a33; --bh-fail-bg: #fbe9e9;
+}
+.mt-bh-wrap { margin-top: 26px; }
+.mt-bh-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px; }
+.mt-bh-count { font-size: 12px; color: var(--color-graphite); font-variant-numeric: tabular-nums; }
+.mt-bh-card { padding: 18px; }
+/* the flag list can run long (every over-budget file); cap it and scroll rather than letting one
+   rotten brain push Recent activity off the page. */
+.mt-bh-list { max-height: 340px; overflow-y: auto; margin: -4px -4px -4px 0; padding-right: 4px; }
+
+.mt-bh-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid var(--hairline-soft); }
+.mt-bh-row:first-child { border-top: none; padding-top: 4px; }
+
+/* min-width so FAIL and WARN render the SAME width: without it the two glyph strings measure
+   differently and every row's file column starts at a different x. */
+.mt-bh-chip {
+  flex: none; min-width: 44px; text-align: center;
+  font-size: 9.5px; font-weight: 600; letter-spacing: .06em;
+  padding: 2px 7px; border-radius: var(--radius-pill); line-height: 14px;
+}
+.mt-bh-chip.fail { background: var(--bh-fail-bg); color: var(--bh-fail); }
+.mt-bh-chip.warn { background: var(--bh-warn-bg); color: var(--bh-warn); }
+
+.mt-bh-main { min-width: 0; flex: 1; }
+.mt-bh-file { font-size: 13.5px; font-weight: 450; color: var(--color-ink); font-family: var(--font-mono);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mt-bh-detail { font-size: 12px; color: var(--color-graphite); margin-top: 2px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.mt-bh-hint { flex: none; max-width: 34%; font-size: 12px; color: var(--color-graphite); text-align: right;
+  font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.mt-bh-fix {
+  flex: none; font-family: inherit; font-size: 12px; cursor: pointer;
+  padding: 4px 10px; border-radius: 8px;
+  border: 1px solid var(--hairline); background: var(--color-pure-white); color: var(--color-ash);
+}
+.mt-bh-fix:hover:not(:disabled) { border-color: var(--color-rust); color: var(--color-rust); }
+.mt-bh-fix:disabled { opacity: .45; cursor: default; }
+
+.mt-bh-ok { display: flex; align-items: center; gap: 9px; padding: 2px 0; }
+.mt-bh-ok-ico { display: inline-flex; flex: none; color: var(--bh-ok); }
+.mt-bh-ok-text { font-size: 14px; color: var(--color-ash); }
+
+/* ---------- brain health: the gated Fix modal ---------- */
+/* Two classes deep so it beats .mt-np-card's 540px: this card carries a side-by-side diff, and a
+   540px column would wrap every line into noise — the diff is the whole basis for approving a
+   write to gitignored data, so it gets the room. */
+.mt-np-card.mt-bh-modal { max-width: 940px; }
+.mt-bh-modal-body { gap: 11px; max-height: 68vh; }
+.mt-bh-sum { font-size: 13px; color: var(--color-ink); background: var(--color-fog);
+  border-radius: 10px; padding: 9px 12px; }
+
+.mt-bh-files { display: flex; flex-direction: column; gap: 2px; }
+.mt-bh-fileitem { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+  font: inherit; font-size: 12px; border: 1px solid transparent; background: none; cursor: pointer;
+  border-radius: 8px; padding: 5px 8px; color: var(--color-ash); }
+.mt-bh-fileitem:hover { background: var(--color-fog); }
+.mt-bh-fileitem.selected { background: var(--color-apricot-wash); color: var(--color-rust); border-color: transparent; }
+.mt-bh-fname { font-family: var(--font-mono); flex: 1; min-width: 0; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; }
+.mt-bh-fdelta { flex: none; font-size: 11px; color: var(--color-graphite); font-variant-numeric: tabular-nums; }
+.mt-bh-fileitem.selected .mt-bh-fdelta { color: inherit; }
+
+.mt-bh-panes { border: 1px solid var(--hairline); border-radius: 10px; overflow: hidden; }
+/* The diff scrolls INSIDE its own pane rather than growing the modal: a rotation plan can move
+   thousands of lines, and the Apply button must never be pushed off-screen. */
+.mt-bh-scroll { max-height: 40vh; }
+
+.mt-bh-note { font-size: 11.5px; color: var(--color-graphite); }
+.mt-bh-backup { font-family: var(--font-mono); font-size: 11.5px; color: var(--color-ink);
+  background: var(--color-fog); border-radius: 8px; padding: 8px 10px; word-break: break-all;
+  user-select: text; }
+.mt-bh-err { font-size: 12.5px; color: var(--bh-fail); background: var(--bh-fail-bg);
+  border-radius: 8px; padding: 9px 11px; white-space: pre-wrap; }
+
+/* dark themes: see the note above — the light hexes go illegible once the surfaces invert. */
+:root[data-theme="ink"],
+:root[data-theme="nocturne"],
+:root[data-theme="xai"],
+:root[data-theme="resend"] {
+  --bh-ok: #9ecb7e; --bh-ok-bg: rgba(63, 185, 80, .16);
+  --bh-warn: #e0a45e; --bh-warn-bg: rgba(224, 164, 94, .18);
+  --bh-fail: #ff5370; --bh-fail-bg: rgba(248, 81, 73, .18);
+}
+
+/* ---------- fonts (drop-in later) ----------
+@font-face { font-family:"Inter"; src:url("./fonts/Inter.woff2") format("woff2"); font-weight:400 500; }
+@font-face { font-family:"Source Serif 4"; src:url("./fonts/SourceSerif4.woff2") format("woff2"); font-weight:400; }
+*/

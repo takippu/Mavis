@@ -1,0 +1,98 @@
+#!/bin/sh
+#
+# commit-msg — reject AI-attribution trailers in commit messages.
+#
+# WHY THIS EXISTS (2026-07-16): the rule `no-co-authored-by-trailers` was in the
+# brain's rules index (personal brain data, gitignored — the shipped statement of
+# the same rule is in AGENTS.md), loaded at session boot, and Mavis violated it
+# anyway on two commits to a client repo's main. Root cause is structural:
+# the Claude Code harness system prompt says "End git commit messages with:
+# Co-Authored-By: Claude ..." and is RE-INJECTED EVERY TURN, while the brain's
+# rules are loaded once at boot and are SUMMARIZED AWAY BY COMPACTION. In a long
+# session the instruction to add the trailer outlives the rule forbidding it.
+#
+# A rule that loses to a re-injected default cannot be fixed by restating the
+# rule. So this is mechanical: it does not care what is in anyone's context.
+# Same reasoning as scripts/lint-index.mjs.
+#
+# CODEX PATTERN ADDED (2026-07-25): the Codex-portability audit found that
+# Codex's default trailer, `Co-authored-by: Codex <noreply@openai.com>`,
+# passed this hook clean — only the Claude/Anthropic pattern was matched.
+# Codex also has a `commit_attribution` config off-switch, but that is not a
+# substitute for this hook: the config is machine-local (set per install),
+# while this hook travels with the brain repo and enforces the rule anywhere
+# it is cloned or the global hooksPath is installed.
+#
+# INSTALL. There is no fixed path here on purpose — this repo gets cloned
+# anywhere, on any platform, so the install line has to derive the path rather
+# than hardcode one. Run this from anywhere inside your clone:
+#
+#   git config --global core.hooksPath "$(git rev-parse --show-toplevel)/scripts/git-hooks"
+#
+# Or spell it out yourself; any absolute path to THIS directory works:
+#
+#   git config --global core.hooksPath "/path/to/Mavis/scripts/git-hooks"
+#
+# Drop --global to install it for one repo only.
+#
+# CAVEAT: a global core.hooksPath is overridden by a repo-local core.hooksPath
+# (husky sets one). In husky repos this hook does NOT run — the rule stands on
+# its own there. Repos using plain .git/hooks are handled: we chain to them below
+# so setting the global path does not silently disable them.
+
+msg_file="$1"
+
+if [ -z "$msg_file" ] || [ ! -f "$msg_file" ]; then
+    exit 0
+fi
+
+# DELIBERATE OVER-BLOCK (ruled 2026-07-25, repo owner): the anthropic/openai.com
+# alternatives below match ANY co-author at anthropic.com or openai.com, and ANY
+# address containing "anthropic" — not just the bots' noreply@ addresses. This is
+# intentional, not an oversight. The cost is asymmetric: a false positive only
+# ever blocks a co-author at openai.com or anthropic.com, which is nobody the
+# owner works with, while a false negative lets an AI attribution trailer land in
+# a public commit — which has already happened once. Narrowing to noreply@ would
+# let variant/renamed trailers slip through, which is the wrong direction. Do NOT
+# narrow these patterns to fix false positives; see the pinning tests in
+# scripts/test/commit-msg-hook.test.mjs for the specific cases this protects.
+if grep -qiE '^[[:space:]]*Co-Authored-By:[[:space:]]*Claude' "$msg_file" \
+    || grep -qiE '^[[:space:]]*Co-Authored-By:[[:space:]]*Codex' "$msg_file" \
+    || grep -qiE 'Generated with \[?Claude Code' "$msg_file" \
+    || grep -qiE 'Generated with \[?Codex' "$msg_file" \
+    || grep -qiE '^[[:space:]]*Co-Authored-By:.*(anthropic|noreply@anthropic)' "$msg_file" \
+    || grep -qiE '^[[:space:]]*Co-Authored-By:.*(noreply@openai|@openai\.com)' "$msg_file"; then
+
+    cat >&2 <<'REASON'
+
+  BLOCKED by the Mavis commit-msg hook: AI attribution in the commit message.
+
+  The rule: this project does not carry AI co-authorship trailers or
+  "Generated with ..." tool footers. Commits and PRs are the repository
+  author's alone, whatever the coding harness suggests by default.
+
+  Stated in the shipped contract: AGENTS.md, "No Co-Authored-By trailers".
+  (The brain's own rules/ directory is personal data and is gitignored, so
+  this message states the rule inline rather than pointing into it.)
+
+  BOTH harnesses inject one by default:
+    Claude Code  Co-Authored-By: Claude <noreply@anthropic.com>
+    Codex        Co-authored-by: Codex <noreply@openai.com>
+
+  Remove the trailer / "Generated with ..." footer and commit again.
+
+REASON
+    exit 1
+fi
+
+# A global core.hooksPath shadows the repo's own .git/hooks. Chain to a local
+# commit-msg hook if one exists, so this guard never costs a repo its hooks.
+# Resolved via --git-dir (NOT --git-path hooks/..., which would resolve back
+# through core.hooksPath to this very file and recurse).
+git_dir="$(git rev-parse --git-dir 2>/dev/null)"
+
+if [ -n "$git_dir" ] && [ -x "$git_dir/hooks/commit-msg" ]; then
+    exec "$git_dir/hooks/commit-msg" "$@"
+fi
+
+exit 0

@@ -1,0 +1,206 @@
+<!--
+  Client Deck — template
+  ---
+  This file is the locked visual baseline for the client-deck skill.
+  Do NOT modify the CSS. Only fill in the marked content slots.
+  Keep total content height ≤ ~750px so the page reads in one screenshot.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<!-- {{TITLE}} : short, descriptive — shows in browser tab -->
+<title>Option N — Topic Title</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:'JetBrains Mono','Cascadia Code','Consolas','Menlo','Courier New',monospace;
+    background:#f7f7f4;color:#111;font-size:13px;line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  .page{max-width:1080px;margin:0 auto;padding:24px 32px 32px;position:relative}
+  .header{border-bottom:1px solid #999;padding-bottom:10px;margin-bottom:14px}
+  .label{
+    text-transform:uppercase;letter-spacing:.14em;font-size:10px;color:#666;
+  }
+  h1{font-size:18px;font-weight:700;margin:4px 0 4px;letter-spacing:0}
+  .subtitle{color:#444;font-size:12.5px;margin:0;max-width:820px}
+  pre.diagram{
+    font-family:inherit;font-size:12.5px;line-height:1.4;
+    margin:14px 0 0;white-space:pre;color:#111;
+  }
+  .h2{
+    text-transform:uppercase;letter-spacing:.12em;font-size:11px;color:#444;
+    font-weight:700;border-bottom:1px solid #999;padding-bottom:4px;
+    margin:18px 0 10px;
+  }
+  .row{display:flex;gap:36px}
+  .col{flex:1;min-width:0}
+  .col h3{
+    font-size:11.5px;font-weight:700;margin:0 0 8px;
+    text-transform:uppercase;letter-spacing:.06em;color:#111;
+  }
+  ul{margin:0;padding:0;list-style:none}
+  li{
+    font-size:12.5px;line-height:1.55;padding-left:14px;
+    position:relative;margin-bottom:3px;
+  }
+  li::before{content:'·';position:absolute;left:4px;top:0;color:#666}
+  .best-for{
+    margin-top:14px;padding:10px 14px;border-left:3px solid #111;
+    background:#fff;font-size:12.5px;
+  }
+  .best-for strong{font-weight:700}
+
+  /* ─── built-in [Copy as image] button (top-right) ───
+     Hides itself during capture, then restores. Don't change position
+     or style — every client-deck deck reads as part of the same series. */
+  .copy-image-btn{
+    position:absolute;top:18px;right:18px;
+    font-family:inherit;font-size:10px;letter-spacing:.12em;
+    text-transform:uppercase;padding:4px 10px;
+    border:1px solid #999;background:#f7f7f4;color:#444;
+    cursor:pointer;user-select:none;
+  }
+  .copy-image-btn:hover{background:#eee}
+  .copy-image-btn:disabled{opacity:.6;cursor:wait}
+  .copy-image-btn.is-success{background:#111;color:#fff;border-color:#111}
+  .copy-image-btn.is-error{background:#fff;color:#a00;border-color:#a00}
+</style>
+</head>
+<body>
+<div class="page">
+  <button type="button" id="copy-image-btn" class="copy-image-btn">Copy as image</button>
+  <div class="header">
+    <!--
+      {{LABEL}} : uppercase, dotted-letter-spacing label
+        - multi-option: "OPTION N OF M — <TOPIC>"
+        - single-doc:   "REFERENCE — <TOPIC>"   or   "PROPOSAL — <TOPIC>"
+    -->
+    <div class="label">OPTION N OF M — TOPIC</div>
+
+    <!-- {{TITLE_H1}} : plain-English, no jargon -->
+    <h1>Title goes here</h1>
+
+    <!-- {{SUBTITLE}} : 1–2 sentences capturing the essence. ≤ 820px wide. -->
+    <p class="subtitle">One- or two-sentence summary that explains the idea without engineering jargon. Lead with what it does for the customer or for the business — not how it works.</p>
+  </div>
+
+  <!--
+    {{DIAGRAM}} : the centerpiece ASCII art. The skill's primitives:
+      ┌─┐│└─┘    single-line box, default
+      ╔═╗║╚╝    double-line box, emphasis (security gate, QR, key element)
+      ▓ ▒ ░     shading
+      ▶ ◀ ▼ ▲   directional flow
+      → ← ─▶    inline arrows
+      ────       separator
+      · ► •     bullets
+
+    Box header convention:    ┌─ STEP N · <label> ──────────────────┐
+    Annotation:                ◀── <note>     or     ── <note> ──▶
+    Keep total <pre> height ≤ ~25 lines whenever possible.
+  -->
+<pre class="diagram">
+   ┌─ STEP 1 · First action ─────────────────────────────────────────────────┐
+   └─────────────────────────────────────────────────────────────────────────┘
+                                       │
+                                       ▼
+   ┌─ STEP 2 · Decision / gate ──────────────────────────────────────────────┐  ◀── annotation
+   │     · sub-point one                                                     │
+   │     · sub-point two                                                     │
+   └─────────────────────────────────────────────────────────────────────────┘
+                                       │
+                                       ▼
+   ┌─ DONE   · Final state ──────────────────────────────────────────────────┐
+   └─────────────────────────────────────────────────────────────────────────┘
+</pre>
+
+  <div class="h2">Pros &amp; Cons</div>
+  <div class="row">
+    <div class="col">
+      <h3>+ Pros</h3>
+      <!-- {{PROS}} : 4–6 factual bullets. Parallel structure. No marketing language. -->
+      <ul>
+        <li>Pro one — short, factual, leads with the benefit.</li>
+        <li>Pro two.</li>
+        <li>Pro three.</li>
+        <li>Pro four.</li>
+      </ul>
+    </div>
+    <div class="col">
+      <h3>− Cons</h3>
+      <!-- {{CONS}} : 4–6 factual bullets. Same structure as pros. Don't sugar-coat. -->
+      <ul>
+        <li>Con one — short, factual, leads with the cost or limitation.</li>
+        <li>Con two.</li>
+        <li>Con three.</li>
+        <li>Con four.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!--
+    {{BEST_FOR}} : 1–2 sentences naming the specific scenario.
+    Be opinionated. "Recommended as the primary path" or "Best as fallback only."
+  -->
+  <p class="best-for"><strong>Best for:</strong> name the specific scenario where this option wins. Be opinionated — recommend the role this option should play (primary path, fallback, last resort).</p>
+</div>
+
+<!-- ─── built-in [Copy as image] feature — do not modify ─────────────────
+     Renders .page to a PNG via html-to-image and writes to the clipboard
+     via the Clipboard API. Hides the copy button during capture. -->
+<script src="https://unpkg.com/html-to-image@1.11.13/dist/html-to-image.js"></script>
+<script>
+(function(){
+  var btn = document.getElementById('copy-image-btn');
+  var page = document.querySelector('.page');
+  var defaultLabel = 'Copy as image';
+
+  function setLabel(text, cls){
+    btn.textContent = text;
+    btn.classList.remove('is-success','is-error');
+    if (cls) btn.classList.add(cls);
+  }
+
+  btn.addEventListener('click', async function(){
+    btn.disabled = true;
+    setLabel('Capturing…');
+    var prevVis = btn.style.visibility;
+    btn.style.visibility = 'hidden';
+    try {
+      if (!window.htmlToImage) throw new Error('html-to-image library not loaded');
+      if (!navigator.clipboard || !window.ClipboardItem) throw new Error('Clipboard image API not supported in this browser');
+      var rect = page.getBoundingClientRect();
+      var blob = await htmlToImage.toBlob(page, {
+        pixelRatio: 2,
+        backgroundColor: '#f7f7f4',
+        cacheBust: true,
+        width: Math.ceil(rect.width),
+        height: Math.ceil(rect.height),
+        style: {
+          margin: '0',
+          maxWidth: 'none',
+          transform: 'none',
+          transformOrigin: '0 0'
+        }
+      });
+      if (!blob) throw new Error('Capture returned no blob');
+      await navigator.clipboard.write([ new ClipboardItem({ 'image/png': blob }) ]);
+      setLabel('Copied!', 'is-success');
+    } catch (err) {
+      console.error('[copy-as-image]', err);
+      setLabel('Failed — see console', 'is-error');
+    } finally {
+      btn.style.visibility = prevVis;
+      setTimeout(function(){
+        setLabel(defaultLabel);
+        btn.disabled = false;
+      }, 1500);
+    }
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,119 @@
+/* Changes view — rail + side-by-side diff. Tokens from steep.css. */
+/* The diff tints and status hues are the ONE place this view can't resolve straight from a
+   steep token: green-means-added has no token. They get their own vars, tuned for the light
+   surface here and RETUNED for the four dark themes at the foot of this file — a hard-coded
+   light hex is unreadable once --color-pure-white inverts to near-black (files.css:184 hit
+   the same wall). Every other colour in this file is a token reference. */
+:root {
+  --diff-add-bg: #e7f4ea; --diff-add-gut: #b7dcc1;
+  --diff-del-bg: #fbe9e9; --diff-del-gut: #e9b7b7;
+  --diff-gap-bg: var(--color-fog);
+  --st-mod: #8a6d1f; --st-add: #2f7a43; --st-del: #a33; --st-ren: #4a6da3;
+  --st-del-line: #e9b7b7;
+}
+.mt-chg { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.mt-chg-head { display: flex; align-items: center; gap: 8px; padding: 8px 12px;
+  border-bottom: 1px solid var(--hairline); background: var(--color-pure-white); flex: none; }
+.mt-chg-repo, .mt-chg-branch { display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12px; border-radius: var(--radius-pill); padding: 3px 10px;
+  border: 1px solid var(--hairline); background: var(--color-fog); color: var(--color-ash); }
+.mt-chg-branch { color: var(--color-rust); background: var(--color-apricot-wash); border-color: transparent; cursor: pointer; }
+.mt-chg-spacer { flex: 1; }
+.mt-chg-btn { font-size: 12px; border: 1px solid var(--hairline); background: var(--color-pure-white);
+  color: var(--color-ash); border-radius: 8px; padding: 4px 10px; cursor: pointer; }
+.mt-chg-btn:disabled { opacity: .45; cursor: default; }
+.mt-chg-body { flex: 1; display: flex; min-height: 0; }
+
+.mt-chg-rail { width: 220px; flex: none; overflow-y: auto; background: var(--color-pure-white);
+  border-right: 1px solid var(--hairline); padding: 6px 0; }
+.mt-chg-rail-collapsed .mt-chg-rail { width: 30px; }
+.mt-chg-rail-collapsed .mt-chg-f-name,
+.mt-chg-rail-collapsed .mt-chg-f-dir,
+.mt-chg-rail-collapsed .mt-chg-ck,
+.mt-chg-rail-collapsed .mt-chg-sec,
+.mt-chg-rail-collapsed .mt-chg-commit { display: none; }
+/* Rail-SCOPED: .mt-chg-empty is also the diff pane's empty state (and its { error }
+   sentinel text). A bare .mt-chg-empty here would hide git's error messages whenever the
+   rail is collapsed — the collapse class sits on the view root, not on the rail. */
+.mt-chg-rail-collapsed .mt-chg-rail .mt-chg-empty { display: none; }
+.mt-chg-rail-toggle { display: block; margin: 0 6px 6px auto; border: 0; background: none;
+  color: var(--color-rust); font-size: 13px; cursor: pointer; padding: 2px 4px; }
+.mt-chg-sec { display: flex; align-items: center; gap: 6px; padding: 8px 10px 4px; }
+.mt-chg-sec-label { font-size: 9px; text-transform: uppercase; letter-spacing: .07em;
+  color: var(--color-dove); font-weight: 600; }
+.mt-chg-sec-act { margin-left: auto; font-size: 10px; border: 0; background: none;
+  color: var(--color-graphite); cursor: pointer; text-decoration: underline; }
+.mt-chg-f { display: flex; align-items: center; gap: 6px; padding: 4px 10px; font-size: 12px;
+  color: var(--color-ash); cursor: pointer; }
+.mt-chg-f:hover { background: var(--color-fog); }
+.mt-chg-f.selected { background: var(--color-apricot-wash); color: var(--color-rust); font-weight: 600; }
+.mt-chg-f-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mt-chg-f-dir { color: var(--color-dove); font-size: 10px; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; font-weight: 400; }
+.mt-chg-ck { width: 11px; height: 11px; border: 1px solid var(--color-dove); border-radius: 3px; flex: none; cursor: pointer; }
+.mt-chg-ck.on { background: var(--color-rust); border-color: var(--color-rust); }
+/* an unmerged path has no staging gesture — the box is a marker, not a control */
+.mt-chg-ck.inert { border-style: dashed; border-color: var(--color-graphite); cursor: default; }
+.mt-chg-st { font-family: var(--font-mono); font-size: 10px; font-weight: 700; width: 10px;
+  flex: none; text-align: center; }
+.mt-chg-st.s-M { color: var(--st-mod); } .mt-chg-st.s-A { color: var(--st-add); }
+.mt-chg-st.s-D { color: var(--st-del); } .mt-chg-st.s-R { color: var(--st-ren); } .mt-chg-st.s-U { color: var(--color-dove); }
+.mt-chg-st.s-conflict { color: var(--color-rust); }
+.mt-chg-commit { padding: 8px 10px; border-top: 1px solid var(--hairline-soft); margin-top: 6px; }
+.mt-chg-msg { width: 100%; font-family: var(--font-sohne); font-size: 12px; resize: vertical;
+  border: 1px solid var(--hairline); border-radius: 8px; padding: 6px; background: var(--color-pure-white);
+  color: var(--color-ink); }
+.mt-chg-commit-btn { width: 100%; margin-top: 6px; font-size: 12px; border: 0; border-radius: 8px;
+  padding: 6px; background: var(--btn-bg); color: var(--btn-fg); cursor: pointer; }
+.mt-chg-commit-btn:disabled { opacity: .4; cursor: default; }
+
+.mt-chg-diff { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--color-pure-white); }
+.mt-chg-empty { padding: 20px; color: var(--color-graphite); font-size: 13px; }
+
+.mt-chg-diff-head { display: flex; align-items: center; gap: 8px; padding: 5px 10px;
+  border-bottom: 1px solid var(--hairline-soft); flex: none; font-size: 12px; }
+.mt-chg-diff-name { font-weight: 600; color: var(--color-ink); }
+.mt-chg-diff-dir { color: var(--color-dove); font-size: 10px; }
+.mt-chg-diff-stat { font-family: var(--font-mono); font-size: 11px; }
+.mt-chg-diff-stat.add { color: var(--st-add); } .mt-chg-diff-stat.del { color: var(--st-del); }
+.mt-chg-btn.danger { color: var(--st-del); border-color: var(--st-del-line); }
+.mt-chg-scroll { flex: 1; overflow: auto; min-height: 0; }
+/* ONE grid, two columns — the sides cannot drift, so there's no scroll-sync code. */
+.mt-chg-grid { display: grid; grid-template-columns: 1fr 1fr; font-family: var(--font-mono);
+  font-size: 12px; line-height: 18px; min-width: 0; }
+.mt-chg-col-h { position: sticky; top: 0; z-index: 1; background: var(--color-pure-white);
+  font-family: var(--font-sohne); font-size: 9px; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--color-dove); font-weight: 600; padding: 3px 8px; border-bottom: 1px solid var(--hairline-soft); }
+.mt-chg-col-h + .mt-chg-col-h { border-left: 1px solid var(--hairline); }
+.mt-chg-hunk { font-family: var(--font-mono); font-size: 10px; color: var(--color-graphite);
+  background: var(--color-fog); padding: 2px 8px; border-top: 1px solid var(--hairline-soft);
+  border-bottom: 1px solid var(--hairline-soft); }
+.mt-chg-ln { display: flex; gap: 6px; padding: 0 6px; white-space: pre; overflow: hidden;
+  color: var(--color-ash); min-width: 0; }
+.mt-chg-ln.side-new { border-left: 1px solid var(--hairline); }
+.mt-chg-ln.add { background: var(--diff-add-bg); box-shadow: inset 2px 0 0 var(--diff-add-gut); }
+.mt-chg-ln.del { background: var(--diff-del-bg); box-shadow: inset 2px 0 0 var(--diff-del-gut); }
+.mt-chg-ln.gap { background: var(--diff-gap-bg); }
+.mt-chg-n { color: var(--color-dove); width: 34px; text-align: right; flex: none; font-size: 10px;
+  user-select: none; }
+.mt-chg-c { overflow: hidden; text-overflow: clip; }
+.mt-chg-trunc { padding: 8px 10px; font-size: 11px; color: var(--color-rust);
+  background: var(--color-apricot-wash); flex: none; }
+
+/* ---------- dark surface: the four dark app themes ---------- */
+/* ink / nocturne / xai / resend invert --color-pure-white to near-black and --color-ash to a
+   LIGHT grey. The light tints above then carry that light text at 1.8-2.2:1 — so the added
+   and removed lines, the entire point of the view, go illegible while the untinted ctx rows
+   around them read fine. Same defect class files.css:184-198 already fixes for the editor.
+   The tints are rgba OVERLAYS rather than hexes: they composite over whatever the pane
+   background is, so one pair covers four themes whose backgrounds span #1f2127 to #000. */
+:root[data-theme="ink"],
+:root[data-theme="nocturne"],
+:root[data-theme="xai"],
+:root[data-theme="resend"] {
+  --diff-add-bg: rgba(63, 185, 80, .16); --diff-add-gut: #3fb950;
+  --diff-del-bg: rgba(248, 81, 73, .18); --diff-del-gut: #f85149;
+  /* brighter hues, mirroring files.css's dark syntax palette */
+  --st-mod: #e0a45e; --st-add: #9ecb7e; --st-del: #ff5370; --st-ren: #82aaff;
+  --st-del-line: rgba(255, 83, 112, .45);
+}

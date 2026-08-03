@@ -1,0 +1,85 @@
+# CI for the Mavis brain scaffold.
+#
+# WHY A TWO-OS MATRIX, and not just the cheap Ubuntu runner:
+#   - windows-latest catches the CRLF class of bug. This project is developed on Windows and
+#     ships a generated CLAUDE.md that must match what sync-contract.mjs renders from AGENTS.md
+#     BYTE FOR BYTE. Before .gitattributes pinned eol=lf, a plain checkout on Windows rewrote
+#     every text file to CRLF and produced a permanent phantom contract-sync failure that
+#     --write could not clear. The Windows leg is what proves the pin still holds.
+#   - ubuntu-latest catches the file-mode / exec-bit class. scripts/git-hooks/commit-msg is a
+#     POSIX sh script that git must check out executable, and a CRLF shebang line makes the
+#     kernel fail to exec the interpreter with a bare "bad interpreter". Neither symptom is
+#     observable on Windows, where the mode bit is meaningless and the hook runs under Git Bash.
+#
+# There is no build, no deploy, and nothing to publish here. This workflow only verifies.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: verify (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      # Both legs always run. A Windows-only or Linux-only failure is exactly the signal this
+      # matrix exists to produce, so fail-fast would throw away half the information.
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          # The root manifest has no lockfile (zero dependencies by design), so point the cache
+          # at the only lockfile in the tree. Without this, setup-node errors out looking for
+          # a root package-lock.json.
+          cache-dependency-path: terminal-app/package-lock.json
+
+      # The brain's own memory directories are gitignored, so a fresh checkout has no
+      # preferences/, rules/, or topics/. Seed them from seeds/ before anything reads them:
+      # lint-brain.mjs walks those trees, and --check below asserts the seeding actually landed
+      # in _details/ subdirectories rather than being flattened (the failure mode the old
+      # PowerShell one-liner in SETUP.md produced while still exiting 0).
+      - name: Seed the brain from seeds/
+        run: node scripts/init-brain.mjs --write
+
+      - name: init-brain --check
+        run: node scripts/init-brain.mjs --check
+
+      # CLAUDE.md is generated from AGENTS.md. Drift means someone hand-edited the generated
+      # file or forgot to run --write. This is the check the Windows leg exists for.
+      - name: Contract sync (CLAUDE.md matches AGENTS.md)
+        run: node scripts/sync-contract.mjs --check
+
+      - name: Brain lint (size budgets, link integrity, index rules)
+        run: node scripts/lint-brain.mjs
+
+      # Quoted glob, NOT a directory path. `node --test scripts/test/` fails with
+      # MODULE_NOT_FOUND on Windows; the glob form works identically on both platforms because
+      # node expands it itself rather than relying on the shell.
+      - name: Scripts test suite
+        run: node --test "scripts/test/*.test.mjs"
+
+      # The terminal-app suite genuinely needs its dependencies installed: src/token-store.js
+      # requires('electron') at module load, and src/pty-session.js requires('node-pty'). Both
+      # throw without node_modules, so skipping the install would silently drop those tests
+      # rather than run them.
+      - name: Install terminal-app dependencies
+        run: npm ci
+        working-directory: terminal-app
+
+      - name: Terminal-app test suite
+        run: node --test "test/*.test.js"
+        working-directory: terminal-app

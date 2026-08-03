@@ -1,0 +1,33 @@
+{
+  "name": "mavis-brain",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Mavis: a portable long-term-memory scaffold for coding agents. Contract, seeds, maintenance scripts, brain graph, and a desktop shell.",
+  "license": "MIT",
+  "author": "Thaqif",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/takippu/Mavis.git"
+  },
+  "bugs": {
+    "url": "https://github.com/takippu/Mavis/issues"
+  },
+  "homepage": "https://github.com/takippu/Mavis#readme",
+  "keywords": [
+    "agent-memory",
+    "claude-code",
+    "codex",
+    "markdown",
+    "developer-tools"
+  ],
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "test": "node --test \"scripts/test/*.test.mjs\"",
+    "lint": "node scripts/lint-brain.mjs",
+    "check:contract": "node scripts/sync-contract.mjs --check",
+    "check:brain": "node scripts/init-brain.mjs --check",
+    "check": "npm run test && npm run lint && npm run check:contract && npm run check:brain"
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "name": "mavis-terminal",
+  "version": "0.6.0",
+  "private": true,
+  "description": "Desktop shell that loads Mavis on launch — embeds Claude Code or Codex with a harness-aware Mavis autorun command + a read-only project sidebar.",
+  "license": "MIT",
+  "author": "Thaqif",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/takippu/Mavis.git",
+    "directory": "terminal-app"
+  },
+  "bugs": {
+    "url": "https://github.com/takippu/Mavis/issues"
+  },
+  "homepage": "https://github.com/takippu/Mavis/tree/main/terminal-app#readme",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test \"test/*.test.js\"",
+    "dist": "electron-builder --win",
+    "postdist": "node scripts/copy-portable.js"
+  },
+  "dependencies": {
+    "@xterm/addon-fit": "^0.10.0",
+    "@xterm/xterm": "^5.5.0",
+    "codemirror": "^5.65.21",
+    "node-pty": "^1.0.0"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.trlabs.mavisterminal",
+    "productName": "Mavis-Terminal",
+    "npmRebuild": false,
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "**/node_modules/node-pty/**"
+    ],
+    "win": {
+      "icon": "src/renderer/assets/mavis-logo.png",
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "shortcutName": "Mavis-Terminal"
+    }
+  }
+}

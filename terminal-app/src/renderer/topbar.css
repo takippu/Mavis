@@ -1,0 +1,103 @@
+/* Direction C — underline-minimal session tabs.
+   Loaded AFTER steep.css (see index.html) so these rules own the tab visuals; the pill-era
+   .mt-tab* rules were removed from steep.css. Reuses steep.css's strip layout (.mt-tabs), the
+   ellipsizing label base (.mt-tab-label), and the activity dot (.mt-tab-dot*, left untouched here
+   beyond spacing). Everything is token-driven so it holds across all 9 themes — labels/glyphs use
+   --titlebar-fg (which is --color-ink on every theme except Morflax's dark nav, where it's the
+   light foreground) so contrast stays correct on the dark titlebar. */
+
+/* Each tab: a plain label with a leading status dot — no pill background, no border. The 2px
+   active underline hangs off the tab's own bottom edge, so the tab is a positioning context. */
+.mt-tab {
+  position: relative;
+  display: flex; align-items: center; gap: 7px;   /* leading-dot → label spacing */
+  flex: none; max-width: 220px; min-width: 0;
+  padding: 6px 8px; border-radius: 8px;
+  background: none; border: none; cursor: pointer;
+  color: var(--titlebar-fg);
+}
+/* subtle affordance wash on hover (kept faint — Direction C stays minimal). Token-based so it
+   reads on both light and dark titlebars. The active tab already carries the underline, so it
+   doesn't take the wash. */
+.mt-tab:hover:not(.active) { background: color-mix(in srgb, var(--titlebar-fg) 6%, transparent); }
+.mt-tab.dragging { opacity: .5; cursor: grabbing; }
+
+/* Label: dimmed when inactive (opacity on the LABEL child only — never the whole tab — so the
+   activity dot keeps full strength). Lifts slightly on hover for feedback. */
+.mt-tab-label {
+  color: var(--titlebar-fg); opacity: .58;
+  font-size: 13.5px; font-weight: 440; letter-spacing: -0.006em;
+  max-width: 168px;
+}
+.mt-tab:hover:not(.active) .mt-tab-label { opacity: .82; }
+/* Active: full-strength label at weight 540 + the 2px rust underline (per-project --tabc when the
+   tab is tinted). */
+.mt-tab.active .mt-tab-label { opacity: 1; font-weight: 540; }
+.mt-tab.active::after {
+  content: ''; position: absolute; left: 8px; right: 8px; bottom: 0; height: 2px;
+  border-radius: 2px 2px 0 0; background: var(--color-rust);
+}
+.mt-tab.active.tinted::after { background: var(--tabc); }
+
+/* Close (×): hidden by default, revealed on tab hover and always on the active tab. Uses
+   visibility+opacity (not display) so its slot is reserved — the strip never reflows/jitters as
+   tabs are hovered. */
+.mt-tab-close {
+  visibility: hidden; opacity: 0;
+  flex: none; display: inline-flex; align-items: center; justify-content: center;
+  width: 16px; height: 16px; margin: -2px -2px -2px 0; padding: 0;
+  border: none; background: none; cursor: pointer;
+  color: var(--titlebar-fg); border-radius: 5px;
+  font-family: inherit; font-size: 15px; line-height: 1;
+  transition: opacity .12s ease, background-color .12s ease, color .12s ease;
+}
+.mt-tab:hover > .mt-tab-close,
+.mt-tab.active > .mt-tab-close { visibility: visible; opacity: .5; }
+/* higher specificity than the reveal rules above so the direct-hover state wins */
+.mt-tab:hover > .mt-tab-close:hover,
+.mt-tab.active > .mt-tab-close:hover {
+  opacity: 1; color: var(--color-rust);
+  background: color-mix(in srgb, var(--titlebar-fg) 14%, transparent);
+}
+
+/* '+' new-session button pinned at the end of the strip (holds icon('plus')). */
+.mt-tab-new {
+  flex: none; display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; margin-left: 2px; padding: 0;
+  border: none; background: none; cursor: pointer;
+  color: var(--titlebar-fg); opacity: .6; border-radius: 7px;
+  font-family: inherit;
+  transition: opacity .12s ease, background-color .12s ease;
+}
+.mt-tab-new:hover { opacity: 1; background: color-mix(in srgb, var(--titlebar-fg) 8%, transparent); }
+.mt-tab-new svg { width: 16px; height: 16px; }
+
+/* ---- tab status icon ----
+   The leading .mt-tab-dot now renders a session-state ICON (not a plain dot), coloured by the
+   project colour (--dot): a spinner while processing, a check when done/idle, a question mark when
+   Claude is awaiting input. These override the circle .mt-tab-dot rules that were removed from
+   steep.css. session-view.js swaps the inner glyph on each state change. */
+.mt-tab-dot {
+  flex: none; width: 15px; height: 15px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: none; border-radius: 0; box-shadow: none; opacity: 1;
+  color: var(--dot, var(--color-graphite));
+}
+.mt-tab-dot svg { width: 13px; height: 13px; }
+.mt-tab-dot svg path, .mt-tab-dot svg polyline { stroke-width: 2.4; }
+.mt-tab-dot.idle { color: var(--dot, var(--color-dove)); opacity: .9; }       /* done → check */
+.mt-tab-dot.awaiting { color: var(--dot, var(--color-rust)); }                /* asking → question */
+.mt-tab-dot.busy { color: var(--dot, var(--color-rust)); }                    /* processing → spinner */
+/* processing spinner — a rotating arc in the project colour */
+.mt-dot-spin {
+  width: 12px; height: 12px; border-radius: 50%;
+  border: 2px solid color-mix(in srgb, currentColor 24%, transparent);
+  border-top-color: currentColor;
+  animation: mt-dot-spin .7s linear infinite;
+}
+@keyframes mt-dot-spin { to { transform: rotate(360deg); } }
+/* attention (a completion/await while you're not watching this tab) — glow + pulse the icon */
+.mt-tab-dot.attention {
+  animation: mt-tabdot-pulse 1.1s ease-in-out infinite;
+  filter: drop-shadow(0 0 5px var(--dot, var(--color-rust)));
+}

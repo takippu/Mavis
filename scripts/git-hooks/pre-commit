@@ -1,0 +1,40 @@
+#!/bin/sh
+# Mavis leak guard — refuse to commit personal content into files that will be published.
+#
+# Installed the same way as the sibling commit-msg hook:
+#   git config --global core.hooksPath "<brain>/scripts/git-hooks"
+#
+# BECAUSE THAT SETTING IS GLOBAL, this hook runs in every repository on the machine. It must
+# therefore no-op instantly anywhere that is not a Mavis brain — scanning a user's client repo for
+# that user's own client names would fire constantly on the one place those names belong, and the
+# guard would be switched off within a day. check-leaks.mjs makes that determination itself
+# (isBrainRoot) and exits 0 immediately when it does not apply.
+#
+# What it catches: a tracked file that has absorbed personal content. That is how every real leak
+# in this project arrived — a migration script dumping real preference entries, a test fixture
+# using a real client's board, a skill written from a real engagement, a UI string with the
+# author's name hardcoded. .gitignore has no opinion about file CONTENTS and was blind to all of
+# it. Most of it was not typed by hand either; it was written by an AI assistant that had the real
+# brain loaded and reached for the nearest concrete example.
+#
+# Escape hatches, in order of preference:
+#   - fix the content (replace with a synthetic example)
+#   - `allow:` / `allowpath:` in .mavis-private, for a term or file that is legitimately fine
+#   - a `leak-guard-allow` comment on the single line that needs it
+#   - `git commit --no-verify` for a one-off
+set -e
+
+# Resolve the brain root from this hook's own location: <brain>/scripts/git-hooks/pre-commit.
+HOOK_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+BRAIN_ROOT=$(CDPATH= cd -- "$HOOK_DIR/../.." && pwd)
+GUARD="$BRAIN_ROOT/scripts/check-leaks.mjs"
+
+# A brain that predates the guard, or a hooksPath pointing somewhere unexpected: do not block the
+# user's commit over our own missing file.
+[ -f "$GUARD" ] || exit 0
+
+# No node, no guard. Same reasoning — fail open on a missing toolchain rather than making the
+# repository uncommittable.
+command -v node >/dev/null 2>&1 || exit 0
+
+node "$GUARD" --staged

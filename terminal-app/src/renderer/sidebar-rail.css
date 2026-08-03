@@ -1,0 +1,52 @@
+/* Collapsible sidebar — the icon rail. Loaded AFTER steep.css (see index.html). Every rule is
+   driven off #app.mt-sidebar-collapsed and is token-based so it holds across all 9 themes.
+   Expanded (~210px) ↔ collapsed (~56px) animates via a width transition on #sidebar; the labels,
+   the "Workspace" group heading, and the version footer hide, and the nav icons center. The
+   active-view accent (rust icon on the .mt-nav.active pill from steep.css) stays visible. */
+
+/* smooth width animation both ways; the padding tightens in the collapsed rule below */
+#sidebar { transition: width .18s cubic-bezier(.2,.7,.2,1), padding .18s cubic-bezier(.2,.7,.2,1); }
+
+/* collapse toggle — pinned top of the rail. Right-aligned when expanded, centered when collapsed.
+   Holds the chevrons-left («) / chevrons-right (») glyph swapped by app.js. */
+.mt-sidebar-toggle {
+  flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; margin: 0 -2px 0 0; padding: 0;
+  border: none; background: none; cursor: pointer;
+  color: var(--color-graphite); border-radius: 8px;
+  font-family: inherit;
+  transition: background-color .14s ease, color .14s ease;
+}
+.mt-sidebar-toggle:hover { color: var(--color-ink); background: color-mix(in srgb, var(--color-ink) 7%, transparent); }
+.mt-sidebar-toggle svg { width: 18px; height: 18px; }
+
+/* ---------- collapsed state ---------- */
+#app.mt-sidebar-collapsed #sidebar { width: 56px; padding-left: 8px; padding-right: 8px; }
+
+/* hide the two label tiers + the footer: the "Workspace" group heading (direct child of #sidebar),
+   each nav item's text span (.mt-nav .mt-nav-label), and the version line. Icons stay; each nav
+   button keeps its native `title` tooltip as the only label affordance while collapsed. */
+#app.mt-sidebar-collapsed #sidebar > .mt-nav-label,
+#app.mt-sidebar-collapsed .mt-nav-head > .mt-nav-label,
+#app.mt-sidebar-collapsed .mt-nav .mt-nav-label,
+#app.mt-sidebar-collapsed .mt-nav-version { display: none; }
+
+/* center the icon in each collapsed nav button */
+#app.mt-sidebar-collapsed .mt-nav {
+  justify-content: center; gap: 0; padding-left: 0; padding-right: 0;
+}
+#app.mt-sidebar-collapsed .mt-nav-ico { margin: 0; }
+
+/* when collapsed the head row shrinks to just the toggle — center it in the rail */
+#app.mt-sidebar-collapsed .mt-nav-head { justify-content: center; }
+#app.mt-sidebar-collapsed .mt-sidebar-toggle { margin-right: 0; }
+
+/* Changes badge, collapsed: the label is hidden so the count can no longer sit beside it —
+   overlay it on the icon instead. NOT in the hide-list above: the count is the only signal
+   that there's uncommitted work, and the rail is exactly where you'd want to still see it. */
+#app.mt-sidebar-collapsed .mt-nav { position: relative; }
+#app.mt-sidebar-collapsed .mt-nav-badge {
+  position: absolute; top: 1px; right: 3px; margin-left: 0;
+  min-width: 14px; padding: 0 3px; font-size: 9px; line-height: 14px;
+}

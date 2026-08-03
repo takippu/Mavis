@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <!-- Defense-in-depth CSP for the file://-loaded renderer (the Files view now renders arbitrary
+         file paths + contents). All scripts/styles/fonts are local ('self' = the file: origin);
+         img also allows data:/blob: (pasted-image + PM thumbnails); no eval (CM5/xterm need none),
+         no remote origins. The Map <webview> is a separate guest, not governed by this CSP. -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'" />
+    <link rel="stylesheet" href="../../node_modules/@xterm/xterm/css/xterm.css" />
+    <link rel="stylesheet" href="./steep.css" />
+    <!-- CodeMirror 5 (UMD) — the Files-view editor. Loaded straight from node_modules like xterm
+         (no bundler); the global `CodeMirror` + its modes are ready before files-view.js runs. -->
+    <link rel="stylesheet" href="../../node_modules/codemirror/lib/codemirror.css" />
+    <script src="../../node_modules/codemirror/lib/codemirror.js"></script>
+    <!-- CM modes (extension → mode). Ordered for dependencies: xml/javascript/css before htmlmixed,
+         clike before php. Unknown extensions fall back to plain text (no mode). -->
+    <script src="../../node_modules/codemirror/mode/javascript/javascript.js"></script>
+    <script src="../../node_modules/codemirror/mode/xml/xml.js"></script>
+    <script src="../../node_modules/codemirror/mode/css/css.js"></script>
+    <script src="../../node_modules/codemirror/mode/htmlmixed/htmlmixed.js"></script>
+    <script src="../../node_modules/codemirror/mode/clike/clike.js"></script>
+    <script src="../../node_modules/codemirror/mode/php/php.js"></script>
+    <script src="../../node_modules/codemirror/mode/markdown/markdown.js"></script>
+    <script src="../../node_modules/codemirror/mode/python/python.js"></script>
+    <script src="../../node_modules/codemirror/mode/shell/shell.js"></script>
+    <script src="../../node_modules/codemirror/mode/powershell/powershell.js"></script>
+    <script src="../../node_modules/codemirror/mode/yaml/yaml.js"></script>
+    <script src="../../node_modules/codemirror/mode/sql/sql.js"></script>
+    <script src="../../node_modules/codemirror/mode/dart/dart.js"></script>
+    <!-- runMode: highlight a string WITHOUT a full editor (the Changes view's diff cells). -->
+    <script src="../../node_modules/codemirror/addon/runmode/runmode.js"></script>
+    <!-- feature stylesheets — loaded AFTER steep.css so they own the Direction-C tab visuals,
+         the collapsed icon-rail, and the Files-view tree/editor chrome (+ CM theme override). -->
+    <link rel="stylesheet" href="./topbar.css" />
+    <link rel="stylesheet" href="./sidebar-rail.css" />
+    <link rel="stylesheet" href="./files.css" />
+    <link rel="stylesheet" href="./changes.css" />
+    <title>Mavis-Terminal</title>
+  </head>
+  <body>
+    <div id="mt-loader" class="mt-loader" role="status" aria-live="polite" aria-label="Loading Mavis">
+      <div class="mt-loader-inner">
+        <img class="mt-loader-logo" src="./assets/mavis-logo.png" alt="" aria-hidden="true" />
+        <div class="mt-loader-name">Mavis</div>
+        <div class="mt-loader-bar" aria-hidden="true"><span></span></div>
+        <div class="mt-loader-cap">Loading your workspace…</div>
+      </div>
+    </div>
+    <div id="app">
+      <div id="titlebar" class="mt-titlebar"></div>
+      <div class="mt-shell">
+        <aside id="sidebar" class="mt-sidebar"></aside>
+        <main id="main" class="mt-main">
+          <div id="view-host" class="mt-view-host"></div>
+          <div id="sessions-host" class="mt-sessions-host hidden"></div>
+        </main>
+      </div>
+    </div>
+
+    <!-- xterm UMD globals: Terminal, FitAddon -->
+    <script src="../../node_modules/@xterm/xterm/lib/xterm.js"></script>
+    <script src="../../node_modules/@xterm/addon-fit/lib/addon-fit.js"></script>
+
+    <!-- MT modules (attach to window.MT); app.js orchestrates last -->
+    <script src="./icons.js"></script>
+    <script src="./context-menu.js"></script>
+    <script src="./dropdown.js"></script>
+    <script src="./confirm.js"></script>
+    <script src="./async-view.js"></script>
+    <script src="./skeleton.js"></script>
+    <script src="./md.js"></script>
+    <script src="./charts.js"></script>
+    <script src="./toast.js"></script>
+    <script src="./notify.js"></script>
+    <script src="./tile-layout.js"></script>
+    <script src="./tui-detect.js"></script>
+    <script src="./session-view.js"></script>
+    <script src="./dashboard-view.js"></script>
+    <script src="./projects-view.js"></script>
+    <script src="./new-project.js"></script>
+    <script src="./command-palette.js"></script>
+    <script src="./settings-view.js"></script>
+    <script src="./detail-view.js"></script>
+    <script src="./pm-view.js"></script>
+    <script src="./image-viewer.js"></script>
+    <script src="./pm-task.js"></script>
+    <script src="./map-view.js"></script>
+    <script src="./dailyops-view.js"></script>
+    <script src="./daily-log-view.js"></script>
+    <script src="./topics-view.js"></script>
+    <script src="./entry-editor.js"></script>
+    <script src="./journal-view.js"></script>
+    <script src="./mavis-config-view.js"></script>
+    <script src="./integrations-settings.js"></script>
+    <script src="./brain-chat.js"></script>
+    <script src="./files-view.js"></script>
+    <script src="./changes-view.js"></script>
+    <!-- MUST stay above app.js: buildSidebar() calls MT.brainHealth.mountBadge() during app.js's
+         boot, and `MT.x = ...` is not hoisted across files any more than within one. -->
+    <script src="./brain-health-view.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>

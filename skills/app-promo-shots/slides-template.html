@@ -1,0 +1,77 @@
+<!doctype html>
+<!-- app-promo-shots :: slide deck skeleton. One HTML, ?s=N shows one slide.
+     Render each: chrome --headless=new --window-size=1080,1350 --force-device-scale-factor=2
+       --screenshot=slide-N.png "file:///abs/path/slides.html?s=N"
+     SWAP: the :root tokens, the fonts <link>, the .at-logo lockup (copy the app's
+     EXACT lockup markup+css), the image srcs, and the copy. Keep .screen's
+     aspect-ratio EQUAL to the capture aspect (here 460/1000) or it zoom-crops. -->
+<html lang="ms"><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{ /* <-- swap for the app's real tokens */
+    --bg:#08090a; --panel:#0e1012; --border2:#2a2e33; --text:#f4f5f6; --text2:#c9cdd2; --faint:#5c6167;
+    --accent:#c6f24e; --sg:'Space Grotesk',sans-serif; --in:'Inter',sans-serif; --mo:'JetBrains Mono',monospace;
+    --at-ml:-0.36em; --at-mr:-0.40em; --at-tsz:0.92em; /* the app's locked logo kerning */
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-font-smoothing:antialiased;}
+  html,body{background:#000;}
+  /* EXACT logo lockup — replace with the app's own markup + css, do not hand-rebuild */
+  .at-logo{font-family:var(--sg);font-weight:700;letter-spacing:-.035em;line-height:1;display:inline-flex;align-items:flex-end;white-space:nowrap;color:var(--text);}
+  .at-logo .mark{display:inline-flex;align-items:flex-end;flex:none;color:var(--accent);width:var(--at-tsz);height:calc(var(--at-tsz)*1.16);margin-left:var(--at-ml);margin-right:var(--at-mr);}
+  .at-logo .mark svg{width:100%;height:100%;display:block;overflow:visible;}
+
+  .slide{display:none;width:1080px;height:1350px;position:relative;overflow:hidden;background:var(--bg);padding:92px 88px 0;flex-direction:column;}
+  .slide.on{display:flex;}
+  .slide::after{content:"";position:absolute;left:50%;bottom:-120px;width:900px;height:760px;transform:translateX(-50%);z-index:0;
+    background:radial-gradient(50% 50% at 50% 50%, rgba(198,242,78,.16), transparent 70%);}
+  .brand{position:absolute;top:54px;right:88px;z-index:5;} .brand .at-logo{font-size:31px;}
+  .idx{position:absolute;top:60px;left:88px;z-index:5;font:600 20px var(--mo);letter-spacing:.06em;color:var(--faint);}
+  .copy{position:relative;z-index:3;padding-top:34px;}
+  .eyebrow{font:600 24px var(--mo);color:var(--accent);margin-bottom:24px;}       /* subject-grounded signature */
+  .headline{font:700 82px var(--sg);line-height:1.01;letter-spacing:-.025em;color:var(--text);max-width:900px;}
+  .headline .hl{color:var(--accent);}
+  .sub{font:400 31px var(--in);line-height:1.42;color:var(--text2);margin-top:28px;max-width:770px;}
+  /* flex-start: a tall phone hangs here + bleeds off the bottom (App Store look) */
+  .stage{position:relative;z-index:2;flex:1;margin-top:40px;display:flex;justify-content:center;align-items:flex-start;}
+  .phone{position:relative;width:474px;background:#141619;border:1px solid var(--border2);border-radius:58px;padding:13px;box-shadow:0 44px 90px rgba(0,0,0,.62);}
+  .phone::before{content:"";position:absolute;top:26px;left:50%;transform:translateX(-50%);width:120px;height:9px;border-radius:9px;background:#0a0b0c;z-index:4;}
+  .screen{position:relative;border-radius:46px;overflow:hidden;background:#000;aspect-ratio:460/1000;} /* == capture aspect */
+  .screen img{width:100%;height:100%;object-fit:cover;object-position:top center;display:block;}
+  /* twin phones for a "themes" slide */
+  .twins{display:flex;justify-content:center;align-items:flex-end;}
+  .twins .phone{width:352px;border-radius:46px;padding:11px;} .twins .screen{border-radius:36px;}
+  .twins .p-a{transform:rotate(-5deg) translateX(46px) translateY(24px);z-index:1;} .twins .p-b{transform:rotate(5deg) translateX(-46px);z-index:2;}
+  .tlabel{position:absolute;top:-2px;left:50%;transform:translateX(-50%);z-index:6;font:600 15px var(--mo);color:var(--bg);background:var(--accent);padding:5px 13px;border-radius:20px;}
+</style></head><body>
+
+<template id="logo"><!-- swap this whole span for the app's real lockup markup -->
+  <span class="at-logo" role="img" aria-label="app">app<span class="mark" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 29V17"/><circle cx="10.5" cy="13" r="6" fill="currentColor" stroke="none"/><circle cx="21.5" cy="13" r="6" fill="currentColor" stroke="none"/><circle cx="16" cy="8" r="6.4" fill="currentColor" stroke="none"/></svg></span>name</span>
+</template>
+
+<!-- a single-phone slide -->
+<section class="slide" data-n="1">
+  <span class="idx">01 / 05</span><div class="brand"></div>
+  <div class="copy">
+    <div class="eyebrow">// short signature line</div>
+    <h1 class="headline">Big benefit, <span class="hl">one word</span> accented.</h1>
+    <p class="sub">One plain support sentence in the target language.</p>
+  </div>
+  <div class="stage"><div class="phone"><div class="screen"><img src="app-screen-1.png" alt=""></div></div></div>
+</section>
+
+<!-- a twin-phone "themes" slide -->
+<section class="slide" data-n="3">
+  <span class="idx">03 / 05</span><div class="brand"></div>
+  <div class="copy"><div class="eyebrow">// theme signature</div><h1 class="headline">Make it <span class="hl">yours.</span></h1></div>
+  <div class="stage"><div class="twins">
+    <div class="phone p-a"><span class="tlabel">A</span><div class="screen"><img src="theme-a.png" alt=""></div></div>
+    <div class="phone p-b"><span class="tlabel">B</span><div class="screen"><img src="theme-b.png" alt=""></div></div>
+  </div></div>
+</section>
+
+<script>
+  var t=document.getElementById('logo');
+  document.querySelectorAll('.brand').forEach(function(b){ b.appendChild(t.content.cloneNode(true)); });
+  var n=new URLSearchParams(location.search).get('s')||'1';
+  document.querySelectorAll('.slide').forEach(function(s){ s.classList.toggle('on', s.dataset.n===n); });
+</script></body></html>

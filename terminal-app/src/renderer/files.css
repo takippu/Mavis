@@ -1,0 +1,202 @@
+/* Files view — the lazy file tree + CodeMirror 5 editor chrome, plus a thin CM theme
+   (.cm-s-mavis) driven off Steep tokens. One light + one dark editor surface, keyed off
+   the app's [data-theme] (the four dark themes swap to the terminal-family surface).
+   All colours resolve from steep.css :root vars, so the view follows every theme. */
+
+/* ---------- layout ---------- */
+.mt-files {
+  display: flex;
+  flex-direction: column;
+  /* fill the view-host: 100vh − titlebar(46) − view-host padding(28+28) */
+  height: calc(100vh - 118px);
+  min-height: 320px;
+}
+.mt-files-head { flex: none; display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.mt-files-root {
+  display: inline-flex; align-items: center; gap: 8px; min-width: 0;
+  padding: 6px 12px; border-radius: var(--radius-pill);
+  background: var(--color-pure-white); box-shadow: var(--shadow-soft);
+  color: var(--color-ink); font-size: 13px; max-width: 100%;
+}
+.mt-files-root-ico { display: inline-flex; color: var(--color-graphite); flex: none; }
+.mt-files-root-name { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.mt-files-body {
+  flex: 1; min-height: 0;
+  display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 16px;
+}
+@media (max-width: 860px) { .mt-files-body { grid-template-columns: 200px minmax(0, 1fr); } }
+
+/* ---------- tree ---------- */
+.mt-files-tree {
+  overflow: auto; min-height: 0;
+  background: var(--color-pure-white); border-radius: var(--radius-inputs);
+  box-shadow: var(--shadow-soft); padding: 8px 6px;
+  font-size: 13px; color: var(--color-ink);
+}
+.mt-ftree-row {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 8px; border-radius: 8px; cursor: pointer;
+  user-select: none; white-space: nowrap;
+}
+.mt-ftree-row:hover { background: var(--color-fog); }
+.mt-ftree-filerow.selected { background: var(--color-fog); box-shadow: inset 2px 0 0 var(--color-rust); }
+.mt-ftree-caret {
+  flex: none; width: 12px; height: 12px; display: inline-flex; align-items: center; justify-content: center;
+  color: var(--color-dove); transition: transform .12s ease;
+}
+.mt-ftree-dir.open > .mt-ftree-row > .mt-ftree-caret { transform: rotate(90deg); }
+.mt-ftree-ico { flex: none; display: inline-flex; color: var(--color-graphite); }
+.mt-ftree-dirrow .mt-ftree-ico { color: var(--color-rust); }
+/* the `..` climb row — dimmed and hairline-separated so it reads as navigation, not content */
+.mt-ftree-uprow { color: var(--color-graphite); border-bottom: 1px solid var(--hairline-soft); margin-bottom: 2px; }
+.mt-ftree-uprow .mt-ftree-ico { color: var(--color-graphite); }
+.mt-ftree-uprow .mt-ftree-name { font-family: var(--font-mono); letter-spacing: .04em; }
+.mt-ftree-name { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+/* dirty marker on the open file's row */
+.mt-ftree-filerow.dirty .mt-ftree-name::after { content: ' *'; color: var(--color-rust); font-weight: 700; }
+.mt-ftree-note {
+  padding: 3px 8px; font-size: 12px; color: var(--color-dove);
+  font-family: var(--font-mono); user-select: none;
+}
+
+/* ---------- editor pane ---------- */
+.mt-files-editor {
+  min-width: 0; display: flex; flex-direction: column; overflow: hidden;
+  background: var(--color-pure-white); border-radius: var(--radius-inputs);
+  box-shadow: var(--shadow-soft);
+}
+.mt-files-ed-head {
+  flex: none; display: flex; align-items: center; gap: 6px;
+  padding: 9px 14px; border-bottom: 1px solid var(--hairline);
+  font-size: 13px; color: var(--color-ink);
+}
+.mt-files-ed-name { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono); }
+.mt-files-ed-star { color: var(--color-rust); font-weight: 700; }
+.mt-files-ed-spacer { flex: 1; }
+.mt-files-save {
+  flex: none; cursor: pointer; font: inherit; font-size: 12px; font-weight: 500;
+  padding: 3px 12px; border-radius: var(--radius-pill);
+  background: var(--btn-bg); color: var(--btn-fg); border: none;
+}
+.mt-files-ed-body { flex: 1; min-height: 0; position: relative; display: flex; }
+.mt-files-cm { flex: 1; min-width: 0; min-height: 0; }
+.mt-files-ed-empty {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  color: var(--color-graphite); font-size: 14px; padding: 24px; text-align: center;
+}
+
+/* ---------- CodeMirror theme (.cm-s-mavis) — light surface (default) ---------- */
+.mt-files-cm .CodeMirror {
+  height: 100%; width: 100%;
+  font-family: var(--font-mono); font-size: 13px; line-height: 1.55;
+  background: var(--cm-bg, var(--color-pure-white));
+  color: var(--cm-fg, var(--color-ink));
+}
+.cm-s-mavis .CodeMirror-gutters {
+  background: var(--cm-gutter, var(--color-fog));
+  border-right: 1px solid var(--hairline);
+}
+.cm-s-mavis .CodeMirror-linenumber { color: var(--color-dove); }
+.cm-s-mavis .CodeMirror-cursor { border-left: 1.5px solid var(--color-rust); }
+.cm-s-mavis .CodeMirror-selected { background: var(--cm-sel, rgba(93, 42, 26, .12)); }
+.cm-s-mavis.CodeMirror-focused .CodeMirror-selected { background: var(--cm-sel, rgba(93, 42, 26, .18)); }
+.cm-s-mavis .CodeMirror-activeline-background { background: var(--cm-active, rgba(0, 0, 0, .03)); }
+.cm-s-mavis .CodeMirror-matchingbracket { color: var(--color-rust); font-weight: 700; }
+
+/* syntax — light palette (readable on the paper surface) */
+.cm-s-mavis .cm-comment { color: #8a8f98; font-style: italic; }
+.cm-s-mavis .cm-keyword,
+.cm-s-mavis .cm-builtin { color: #7a3ba8; }
+.cm-s-mavis .cm-atom,
+.cm-s-mavis .cm-number { color: #b45309; }
+.cm-s-mavis .cm-string,
+.cm-s-mavis .cm-string-2 { color: #2f6d3a; }
+.cm-s-mavis .cm-def,
+.cm-s-mavis .cm-variable-2 { color: #2f5d8a; }
+.cm-s-mavis .cm-variable,
+.cm-s-mavis .cm-property { color: var(--color-ink); }
+.cm-s-mavis .cm-operator { color: var(--color-ash); }
+.cm-s-mavis .cm-meta { color: var(--color-graphite); }
+.cm-s-mavis .cm-tag { color: #a3341f; }
+.cm-s-mavis .cm-attribute { color: #7a3ba8; }
+.cm-s-mavis .cm-qualifier { color: #2f6d3a; }
+.cm-s-mavis .cm-link { color: #2f5d8a; text-decoration: underline; }
+.cm-s-mavis .cm-header { color: #a3341f; font-weight: 700; }
+.cm-s-mavis .cm-error { color: #c0392b; }
+
+/* ---------- dark editor surface: the four dark app themes ---------- */
+:root[data-theme="ink"],
+:root[data-theme="nocturne"],
+:root[data-theme="xai"],
+:root[data-theme="resend"] {
+  --cm-bg: var(--term-bg);
+  --cm-fg: var(--term-fg);
+  --cm-gutter: var(--color-fog);  /* the dark themes' --color-fog is a near-bg dark shade */
+  --cm-sel: var(--term-sel);
+  --cm-active: rgba(255, 255, 255, .05);
+}
+/* dark syntax palette — brighter hues that read on the terminal-family surface */
+:root[data-theme="ink"] .cm-s-mavis .cm-comment,
+:root[data-theme="nocturne"] .cm-s-mavis .cm-comment,
+:root[data-theme="xai"] .cm-s-mavis .cm-comment,
+:root[data-theme="resend"] .cm-s-mavis .cm-comment { color: #7d828c; }
+:root[data-theme="ink"] .cm-s-mavis .cm-keyword,
+:root[data-theme="nocturne"] .cm-s-mavis .cm-keyword,
+:root[data-theme="xai"] .cm-s-mavis .cm-keyword,
+:root[data-theme="resend"] .cm-s-mavis .cm-keyword,
+:root[data-theme="ink"] .cm-s-mavis .cm-builtin,
+:root[data-theme="nocturne"] .cm-s-mavis .cm-builtin,
+:root[data-theme="xai"] .cm-s-mavis .cm-builtin,
+:root[data-theme="resend"] .cm-s-mavis .cm-builtin { color: #c792ea; }
+:root[data-theme="ink"] .cm-s-mavis .cm-atom,
+:root[data-theme="nocturne"] .cm-s-mavis .cm-atom,
+:root[data-theme="xai"] .cm-s-mavis .cm-atom,
+:root[data-theme="resend"] .cm-s-mavis .cm-atom,
+:root[data-theme="ink"] .cm-s-mavis .cm-number,
+:root[data-theme="nocturne"] .cm-s-mavis .cm-number,
+:root[data-theme="xai"] .cm-s-mavis .cm-number,
+:root[data-theme="resend"] .cm-s-mavis .cm-number { color: #e0a45e; }
+:root[data-theme="ink"] .cm-s-mavis .cm-string,
+:root[data-theme="nocturne"] .cm-s-mavis .cm-string,
+:root[data-theme="xai"] .cm-s-mavis .cm-string,
+:root[data-theme="resend"] .cm-s-mavis .cm-string,
+:root[data-theme="ink"] .cm-s-mavis .cm-string-2,
+:root[data-theme="nocturne"] .cm-s-mavis .cm-string-2,
+:root[data-theme="xai"] .cm-s-mavis .cm-string-2,
+:root[data-theme="resend"] .cm-s-mavis .cm-string-2 { color: #9ecb7e; }
+:root[data-theme="ink"] .cm-s-mavis .cm-def,
+:root[data-theme="nocturne"] .cm-s-mavis .cm-def,
+:root[data-theme="xai"] .cm-s-mavis .cm-def,
+:root[data-theme="resend"] .cm-s-mavis .cm-def,
+:root[data-theme="ink"] .cm-s-mavis .cm-variable-2,
+:root[data-theme="nocturne"] .cm-s-mavis .cm-variable-2,
+:root[data-theme="xai"] .cm-s-mavis .cm-variable-2,
+:root[data-theme="resend"] .cm-s-mavis .cm-variable-2 { color: #82aaff; }
+:root[data-theme="ink"] .cm-s-mavis .cm-tag,
+:root[data-theme="nocturne"] .cm-s-mavis .cm-tag,
+:root[data-theme="xai"] .cm-s-mavis .cm-tag,
+:root[data-theme="resend"] .cm-s-mavis .cm-tag,
+:root[data-theme="ink"] .cm-s-mavis .cm-header,
+:root[data-theme="nocturne"] .cm-s-mavis .cm-header,
+:root[data-theme="xai"] .cm-s-mavis .cm-header,
+:root[data-theme="resend"] .cm-s-mavis .cm-header { color: #f07178; }
+:root[data-theme="ink"] .cm-s-mavis .cm-attribute,
+:root[data-theme="nocturne"] .cm-s-mavis .cm-attribute,
+:root[data-theme="xai"] .cm-s-mavis .cm-attribute,
+:root[data-theme="resend"] .cm-s-mavis .cm-attribute { color: #c792ea; }
+/* remaining light-only hexes remapped for the dark surface — .cm-qualifier (CSS selectors),
+   .cm-link (Markdown links), .cm-error — else they compute to ~2.7–3.4:1 (below AA) on the
+   terminal-family bg. Brighter hues mirror the dark palette above. */
+:root[data-theme="ink"] .cm-s-mavis .cm-qualifier,
+:root[data-theme="nocturne"] .cm-s-mavis .cm-qualifier,
+:root[data-theme="xai"] .cm-s-mavis .cm-qualifier,
+:root[data-theme="resend"] .cm-s-mavis .cm-qualifier { color: #9ecb7e; }
+:root[data-theme="ink"] .cm-s-mavis .cm-link,
+:root[data-theme="nocturne"] .cm-s-mavis .cm-link,
+:root[data-theme="xai"] .cm-s-mavis .cm-link,
+:root[data-theme="resend"] .cm-s-mavis .cm-link { color: #82aaff; }
+:root[data-theme="ink"] .cm-s-mavis .cm-error,
+:root[data-theme="nocturne"] .cm-s-mavis .cm-error,
+:root[data-theme="xai"] .cm-s-mavis .cm-error,
+:root[data-theme="resend"] .cm-s-mavis .cm-error { color: #ff5370; }
