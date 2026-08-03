@@ -1,0 +1,46 @@
+Mavis
+Copyright (c) 2026 Thaqif
+
+This product includes third-party software redistributed under the MIT License.
+Each vendored copy retains its own LICENSE file at the path shown below; those
+licences govern that material, not the MIT licence at the root of this
+repository.
+
+--------------------------------------------------------------------------------
+
+skills/app-store-submission/references/app-store-preflight-skills/
+    App Store Preflight
+    Copyright (c) 2026 truongduy2611
+    MIT License
+    Upstream: https://github.com/truongduy2611/app-store-preflight-skills
+    Licence:  skills/app-store-submission/references/app-store-preflight-skills/LICENSE
+
+skills/app-store-submission/references/appstore-review-skill/
+    App Store / Play Store Review Skill
+    Copyright (c) 2026 devsemih
+    MIT License
+    Upstream: https://github.com/devsemih/appstore-review-skill
+    Licence:  skills/app-store-submission/references/appstore-review-skill/LICENSE
+    Note: the upstream LICENSE file carries no holder name on its copyright line.
+          The attribution above is taken from the repository owner. If you are the
+          author and this is wrong, open an issue and it will be corrected.
+
+skills/app-store-submission/references/aso-skills/
+    ASO Skills
+    Copyright (c) 2026 Erencan
+    MIT License
+    Upstream: https://github.com/eronred/aso-skills
+    Licence:  skills/app-store-submission/references/aso-skills/LICENSE
+
+--------------------------------------------------------------------------------
+
+These three are vendored as third-party copies and are not modified by this
+repository. They are reference material for skills/app-store-submission/SKILL.md,
+which is original work covered by this repository's own MIT licence.
+
+They were copied rather than cloned, so no upstream commit SHA was recorded and
+byte-for-byte equivalence with upstream at any given moment is not asserted here.
+Treat the upstream URL as authoritative; see the refresh procedure below.
+
+Provenance detail, including how to refresh a vendored copy:
+skills/app-store-submission/references/README.md

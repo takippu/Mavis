@@ -206,6 +206,7 @@ nothing until used, which is why a dozen can ship without bloating every session
 | `security-headers` | CSP / HSTS hardening, including the A+-vs-100 gap and the nonce tradeoff |
 | `logo-viz`, `app-promo-shots`, `portrait-cutout`, `promo-video` | Visual asset generation |
 | `connect-pm-mcp` | Wiring a project-management MCP server to your agent |
+| `app-store-submission` | App Store and Play submission, with a blocking signing-ownership gate before anything is scanned |
 
 The authoritative list, with the exact trigger phrases for each, is the Skills table in `AGENTS.md`
 — that table is what the agent actually reads, so treat it, not this one, as the source of truth.
@@ -321,6 +322,10 @@ privately.
 ## License
 
 [MIT](LICENSE) — fork it, use it, modify it, ship your own. Keep the copyright line.
+
+`skills/app-store-submission/references/` vendors three other projects, each MIT and each keeping
+its own `LICENSE`. They are attributed in [NOTICE](NOTICE), with provenance and a refresh procedure
+in [`skills/app-store-submission/references/README.md`](skills/app-store-submission/references/README.md).
 
 ## Not affiliated
 

@@ -1,0 +1,38 @@
+{
+  "$schema": "https://raw.githubusercontent.com/anthropics/claude-code/refs/heads/main/marketplace/marketplace.schema.json",
+  "name": "appstore-review-skill",
+  "owner": {
+    "name": "Semih Aslan"
+  },
+  "metadata": {
+    "description": "App Store and Google Play review policy compliance checker for mobile apps"
+  },
+  "plugins": [
+    {
+      "name": "appstore-review-skill",
+      "source": "./",
+      "description": "Checks mobile app projects against Apple's App Store Review Guidelines and Google Play's Developer Program Policies before submission.",
+      "version": "1.2.0",
+      "author": {
+        "name": "Semih Aslan"
+      },
+      "repository": "https://github.com/devsemih/appstore-review-skill",
+      "license": "MIT",
+      "category": "development",
+      "keywords": [
+        "ios",
+        "android",
+        "app-store",
+        "google-play",
+        "review-guidelines",
+        "play-policy",
+        "apple",
+        "swift",
+        "kotlin",
+        "flutter",
+        "react-native",
+        "expo"
+      ]
+    }
+  ]
+}
