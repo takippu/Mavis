@@ -236,12 +236,23 @@ export function checkRefRules(root) {
   return flags;
 }
 
-// Mirrors scripts/lint-index.mjs exactly: project lines only, DISTINCT dates (bare, not
-// parenthesized), any bold run, >600 chars. Severity is uniformly 'warn' here (plan/spec),
-// whereas lint-index.mjs splits these into ERROR/WARN for its own exit code.
+// Mirrors scripts/lint-index.mjs exactly. Severity is uniformly 'warn' here (plan/spec), whereas
+// lint-index.mjs splits these into ERROR/WARN for its own exit code.
+//
+// The rules TIGHTENED when the `Now:` clause moved out of this file and into each project's own
+// index.md under `## Now`. Before that split a project line carried identity AND state, so these
+// checks could only catch *excess* state — a SECOND date, a bold milestone, a 600-char paragraph.
+// The router is identity-only now, which makes the checks categorical rather than heuristic: ANY
+// date is state that has crept back in.
+//
+// Worth enforcing mechanically because this file is read at every session boot and re-sent every
+// turn, so state creeping back is not untidiness, it is a permanent per-turn tax. The old `Now:`
+// clauses cost ~2,100 tokens a turn to describe 40 projects in order to answer about one.
 const PROJECT_LINE_RE = /^- \[[^\]]+\]\([^)]*index\.md\)/;
 const DATE_RE = /\d{4}-\d{2}-\d{2}/g;
-const MAX_LINE_LEN = 600;
+// Measured after the split across 44 lines: min 64, median 228, p90 331, max 341. 400 clears
+// every real line with headroom and catches one that has started growing a status report.
+const MAX_LINE_LEN = 400;
 
 export function checkProjectsIndex(root) {
   const flags = [];
@@ -251,15 +262,17 @@ export function checkProjectsIndex(root) {
   lines.forEach((l, i) => {
     if (!PROJECT_LINE_RE.test(l)) return;
     const problems = [];
+    // ANY date means per-project state has crept back into the router. It belongs in that
+    // project's own index.md under `## Now`, which loads only when the project is named.
     const dates = new Set(l.match(DATE_RE) ?? []);
-    if (dates.size > 1) problems.push(`${dates.size} dates [${[...dates].join(', ')}]`);
+    if (dates.size) problems.push(`${dates.size} date(s) [${[...dates].join(', ')}] - state belongs in projects/<slug>/index.md ## Now`);
     if (/\*\*/.test(l)) problems.push('bold');
     if (l.length > MAX_LINE_LEN) problems.push(`${l.length} chars (max ${MAX_LINE_LEN})`);
     if (!problems.length) return;
     flags.push({
       type: 'index-line', severity: 'warn', file: 'projects/_index.md',
       detail: `line ${i + 1}: ${problems.join(', ')}`,
-      suggestedAction: 'trim to one line, one date, no bold',
+      suggestedAction: 'identity only - move state to projects/<slug>/index.md ## Now',
     });
   });
   return flags;

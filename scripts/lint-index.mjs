@@ -10,8 +10,12 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
-// Tunables — a healthy project line sits ~150-540 chars with exactly one date.
-const MAX_LEN = 600; // hard bloat backstop
+// Tunables. These tightened when the `Now:` clause moved out of projects/_index.md and into each
+// project's own index.md under `## Now`. The router is identity-only now — slug, type, status, and
+// one clause on what the thing IS — so a date in a project line is not "a second date creeping in",
+// it is per-project STATE that has come back to a file paid for on every turn.
+// Measured after the split across 44 lines: min 64, median 228, p90 331, max 341.
+const MAX_LEN = 400; // hard bloat backstop, with real headroom over the measured max
 const DATE_RE = /\d{4}-\d{2}-\d{2}/g; // YYYY-MM-DD
 const BOLD_RE = /\*\*/g; // milestone-bolding creeping in
 
@@ -31,12 +35,12 @@ lines.forEach((line, i) => {
   const slug = line.match(/^- \[([^\]]+)\]/)?.[1] ?? "?";
 
   if (line.length > MAX_LEN) {
-    errors.push(`line ${n} [${slug}]: ${line.length} chars (max ${MAX_LEN}) — trim Now: to one sentence, move detail to progress.md`);
+    errors.push(`line ${n} [${slug}]: ${line.length} chars (max ${MAX_LEN}) — the router says what a project IS; move state to projects/${slug}/index.md ## Now`);
   }
 
   const distinctDates = new Set(line.match(DATE_RE) ?? []);
-  if (distinctDates.size > 1) {
-    errors.push(`line ${n} [${slug}]: ${distinctDates.size} dates [${[...distinctDates].join(", ")}] — a 2nd date = changelog; keep only the trailing (YYYY-MM-DD), REPLACE the Now: state in place`);
+  if (distinctDates.size > 0) {
+    errors.push(`line ${n} [${slug}]: ${distinctDates.size} date(s) [${[...distinctDates].join(", ")}] — a date here is state; it belongs in projects/${slug}/index.md under ## Now`);
   }
 
   const bolds = (line.match(BOLD_RE) ?? []).length;
@@ -45,7 +49,7 @@ lines.forEach((line, i) => {
   }
 });
 
-const rule = "projects/_index.md is a pointer: one line per project, one current-state sentence, exactly one trailing date, no **bold**. Detail lives in progress.md / notes.md / daily-memories.";
+const rule = "projects/_index.md is a router: one line per project, IDENTITY only — slug, type, status, and one clause on what the thing is. No dates, no state, no **bold**. Current state goes in projects/<slug>/index.md under ## Now; history in progress.md / notes.md / daily-memories.";
 
 if (errors.length === 0 && warnings.length === 0) {
   console.log(`OK  projects/_index.md is clean (${lines.filter(l => l.startsWith("- [")).length} project lines).`);

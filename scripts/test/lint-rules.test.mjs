@@ -65,18 +65,24 @@ test('checkRefRules handles CRLF and an empty details tree', () => {
   assert.deepEqual(checkRefRules(makeBrain({})), []);
 });
 
-test('checkProjectsIndex flags multi-date, bold, and overlong project lines', () => {
+// The router is IDENTITY-ONLY since the `Now:` split: slug, type, status, one clause on what the
+// thing is. State lives in projects/<slug>/index.md under `## Now`. So a date in a project line is
+// no longer "a second date creeping in" — ANY date is state that has come back to a file paid for
+// on every turn.
+test('checkProjectsIndex flags ANY date, bold, and overlong project lines', () => {
   const root = makeBrain({
     'projects/_index.md': [
       '# Projects', '## Active',
-      '- [ok](ok/index.md) — tool, active — fine. Now: good (2026-07-17).',
-      '- [two](two/index.md) — tool, active — drifted. Now: x (2026-07-01) then (2026-07-02).',
-      '- [bold](bold/index.md) — tool, active — **MILESTONE** creep. Now: y (2026-07-17).',
+      '- [ok](ok/index.md) — tool, active — a perfectly fine identity line.',
+      '- [dated](dated/index.md) — tool, active — state crept back in (2026-07-17).',
+      '- [bold](bold/index.md) — tool, active — **MILESTONE** creep.',
     ].join('\n') + '\n',
   });
   const flags = checkProjectsIndex(root);
-  assert.equal(flags.length, 2);
+  assert.equal(flags.length, 2, 'the dateless, unbolded line is clean; the other two are not');
   assert.ok(flags.every(f => f.type === 'index-line' && f.severity === 'warn'));
+  assert.ok(flags[0].detail.includes('2026-07-17'), 'the date flag names the offending date');
+  assert.ok(flags[0].detail.includes('## Now'), 'and says where the state belongs');
 });
 
 test('checkProjectsIndex mirrors lint-index.mjs: DISTINCT dates, project lines only', () => {
@@ -90,14 +96,20 @@ test('checkProjectsIndex mirrors lint-index.mjs: DISTINCT dates, project lines o
     ].join('\n') + '\n',
   });
   const flags = checkProjectsIndex(root);
-  // dup: one DISTINCT date -> clean. bare: two distinct -> flagged. others: not project lines.
-  assert.equal(flags.length, 1);
-  assert.ok(flags[0].detail.startsWith('line 3:'), `expected line 3, got: ${flags[0].detail}`);
-  assert.ok(flags[0].detail.includes('2 dates'));
+  // Both project lines now flag — one distinct date is still a date. The non-project link and the
+  // prose line are still skipped, which is the part of the old behaviour that must NOT change:
+  // the check is scoped to project lines, not to every date in the file.
+  assert.equal(flags.length, 2);
+  assert.ok(flags[0].detail.startsWith('line 2:'), `expected line 2, got: ${flags[0].detail}`);
+  assert.ok(flags[0].detail.includes('1 date(s)'));
+  assert.ok(flags[1].detail.startsWith('line 3:'), `expected line 3, got: ${flags[1].detail}`);
+  assert.ok(flags[1].detail.includes('2 date(s)'));
 });
 
-test('checkProjectsIndex flags >600 char lines and is CRLF-safe on length', () => {
-  const long = '- [big](big/index.md) — tool, active — ' + 'x'.repeat(600) + ' Now: y (2026-07-17).';
+test('checkProjectsIndex flags >400 char lines and is CRLF-safe on length', () => {
+  // Cap tightened from 600 to 400 with the split: measured across 44 real lines afterwards the
+  // max was 341, so 400 has headroom and still catches a line growing a status report.
+  const long = '- [big](big/index.md) — tool, active — ' + 'x'.repeat(420) + ' a long identity clause.';
   const root = makeBrain({ 'projects/_index.md': '# Projects\r\n' + long + '\r\n' });
   const flags = checkProjectsIndex(root);
   assert.equal(flags.length, 1);
