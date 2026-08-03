@@ -33,5 +33,5 @@
 
 ## session-briefing
 **Triggers:** session briefing, briefing, brief me, boot brief, session start, start of session, where were we, where did we leave off, what was i working on, what was i doing, catch me up, catch up, recap, what's in flight, in flight, stale project, resume work, pick up where
-**Summary:** At session start, after auto-load and before the first answer, emit <=8 lines (hard cap 12) built ONLY from the projects router `Now:` lines + today's daily-memory headings — zero new reads, no invented status, cap 3 projects, silence when there is nothing worth saying.
+**Summary:** At session start, after auto-load and before the first answer, emit <=8 lines (hard cap 12) built ONLY from today's daily-memory headings plus the identity-only projects router — zero new reads, no invented status, cap 3 projects, and silence (the common case) when nothing is in flight.
 **Detail:** [_details/session-briefing.md](_details/session-briefing.md)

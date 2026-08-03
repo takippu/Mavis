@@ -1,5 +1,16 @@
 {
   "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/hooks/inject-context.mjs",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
         "matcher": "Write|Edit",
@@ -9,6 +20,15 @@
             "command": "node scripts/hooks/leak-guard-write.mjs",
             "timeout": 20,
             "statusMessage": "Checking for personal content"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/hooks/observe-tool.mjs",
+            "timeout": 5
           }
         ]
       }

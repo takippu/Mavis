@@ -15,8 +15,8 @@ At session start — after the auto-load sequence completes, before answering th
 
 **Sources — and this list is exhaustive.** The briefing may draw ONLY on what auto-load already read:
 
-- `projects/_index.md` — the one line per project, its `Now:` clause and trailing date.
-- The `## <project> — <headline>` headings grepped out of `daily-memories/<today>.md`.
+- `daily-memories/<today>.md` — the `## <project> — <headline>` headings grepped at auto-load. This is the primary source: it is the only free input that says what is actually in flight.
+- `projects/_index.md` — IDENTITY only: slug, type, status, and the one clause on what each project is. **It carries no dates and no state.** Use it to say what a project IS when a daily-memory heading names one, not to rank or to report status.
 - `identity/profile.md` for the user's name.
 
 That is the whole input set. **The briefing adds ZERO new reads.** It does not open a project's `index.md`, `progress.md`, `notes.md`, `decisions.md`, or any `_details` file to build itself. If the loaded context does not support a line, the line does not get written — the missing detail is not worth a read the user did not ask for.
@@ -25,9 +25,8 @@ Shape:
 
 ```
 Where things stand
-- <project> — <the router's Now: clause, compressed to a clause, not copied whole>
-- <project> — <today's daily-memory headline>
-- Stale: <project>, last moved <YYYY-MM-DD>
+- <project> — <today's daily-memory headline, compressed to a clause>
+- <project> — <today's daily-memory headline, compressed to a clause>
 ```
 
 Then a blank line, then the answer to whatever they actually asked.
@@ -35,8 +34,8 @@ Then a blank line, then the answer to whatever they actually asked.
 **Must not:**
 
 - **Invent status.** No "blocked", "at risk", "nearly done", "needs attention" unless those words are in a line that was actually read. Every clause traces to a specific line in the router or a daily-memory heading. This is the honest-about-limits invariant applied to a summary.
-- **Re-list everything.** Cap at three projects — the three with the most recent router dates. A brain with fourteen active projects still gets three lines.
-- **Flag more than one stale project**, and only when its router date is more than fourteen days old and its status is still `active`. Name the single oldest, once. Staleness is an observation, never a nag, and never repeated later in the session.
+- **Re-list everything.** Cap at three projects, taken from today's daily-memory headings in file order. A brain with forty active projects still gets at most three lines, and a day with no daily memory yet gets none.
+- **Report staleness.** There is no free signal for it any more. The router is identity-only — no dates, no state — and the per-project `## Now` sections that hold the dates are exactly the reads this rule forbids. A staleness line would cost forty file opens at every boot to produce one sentence. If the user wants it, they can ask, and it is answered as a normal request with normal reads.
 - **Pad to fill the budget.** Eight lines is a ceiling, not a target.
 - **Speak when there is nothing to say.** A fresh brain, a single project touched an hour ago, or nothing in flight: emit one line or none and go straight to the request. Silence is a valid briefing and the correct one more often than not.
 - **Delay a lifecycle command or a trivial turn.** `setup mavis` / `reset mavis` / `recalibrate mavis` take priority — run the protocol, no briefing. A one-word opener ("hey", "thanks", "yes") gets a normal reply, no briefing; brief on the first substantive turn instead.
@@ -55,7 +54,9 @@ The line budget exists for the same reason as the read budget. A long briefing i
 ## How to apply
 Fires once, on the first substantive turn of a session, after auto-load and before the answer.
 
-Build it in this order. From `projects/_index.md`, take the three project lines with the most recent trailing dates and compress each `Now:` clause to a clause — the router line is already one sentence, so this is trimming, not summarizing, and nothing may be added to it. From today's daily-memory headings (if the file exists at all — on the first session of a day it does not, and that is normal, not a gap to fill with a read), take what is in flight today; where a heading covers a project already listed, merge them into one line instead of writing two. Check the oldest active router date for the single staleness line. Stop at eight lines.
+Build it from today's daily-memory headings. If `daily-memories/<today>.md` does not exist — which is the normal state on the first session of a day — there is nothing in flight to report, and the correct briefing is no briefing. Otherwise take up to three headings in file order and compress each to a clause. Where a heading names a project whose router line adds something the heading does not (what the project actually IS, for a name the user may not recognise cold), one short qualifier from the router is allowed; nothing else from the router may be added. Stop at eight lines.
+
+**Note on what changed.** An earlier draft of this rule ranked projects by the trailing date on their router line and flagged the oldest stale one. That data moved: `projects/_index.md` is identity-only now, and every project's date lives in its own `index.md` under `## Now`. Reading forty of those to rank three is precisely the trade this rule exists to refuse — so the ranking went, rather than the constraint.
 
 Then answer the request. The briefing is a preamble to the reply, not a reply of its own — it never stands alone waiting for acknowledgement, and it never pushes the actual answer below the fold.
 

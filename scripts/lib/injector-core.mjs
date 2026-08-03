@@ -87,8 +87,25 @@ export function sanitizeName(raw) {
   return s.toLowerCase();
 }
 
-/** Absolute path to this brain's injector directory. Does not create it. */
-export function injectDir(brainRoot) {
+/**
+ * Absolute path to this brain's injector directory. Does not create it.
+ *
+ * `MAVIS_INJECT_DIR` overrides it, which exists for ONE reason: without it the tests have to
+ * operate on the real `.mavis-inject/`, and a test that touches live user state is a test that
+ * breaks the moment the feature is actually used. That is not hypothetical — these tests went red
+ * within the hour, because someone set a `focus` injector between writing them and running them.
+ * (`brain-stats.test.js` had the identical defect against the real `identity/`, found the same day.)
+ *
+ * The override must be ABSOLUTE. An env var is a string, and a caller passing `undefined` gets the
+ * literal `"undefined"`, which `path.join` turns into a relative directory that lands wherever the
+ * process is standing — the exact accident that scattered `undefined/lat/*.jsonl` into the repo
+ * root from the observation hook. Ignoring a malformed override and falling back is the only
+ * behaviour that cannot surprise anyone.
+ */
+export function injectDir(brainRoot, override = process.env.MAVIS_INJECT_DIR) {
+  if (typeof override === 'string' && override && override !== 'undefined' && path.isAbsolute(override)) {
+    return override;
+  }
   return path.join(brainRoot, INJECT_DIR);
 }
 

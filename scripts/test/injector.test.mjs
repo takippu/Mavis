@@ -318,50 +318,50 @@ test('clear removes an injector and clearing an unset one is not an error', () =
 // The hook resolves its brain root from its own location, so it always reads the REAL repo's
 // .mavis-inject/. These tests therefore run against the repo and are careful to leave it exactly
 // as they found it -- including not creating the directory if it was not already there.
-function runHook(stdin = '{"hook_event_name":"UserPromptSubmit","prompt":"hello"}') {
+function runHook(dir, stdin = '{"hook_event_name":"UserPromptSubmit","prompt":"hello"}') {
   return execFileSync(process.execPath, [path.join(repoRoot, 'scripts', 'hooks', 'inject-context.mjs')], {
     input: stdin,
     encoding: 'utf8',
+    env: { ...process.env, MAVIS_INJECT_DIR: dir },
   });
 }
 
+// Every subprocess test below runs against an ISOLATED directory, never the live
+// `.mavis-inject/`. The earlier version drove the real one and asserted it was empty first, which
+// turned "the user set an injector" into five red tests. A guard that fails is still a broken
+// suite; isolation is the actual fix.
 function withRepoInjector(entries, fn) {
-  const dir = injectDir(repoRoot);
-  const preexisting = fs.existsSync(dir);
-  const backup = preexisting ? fs.readdirSync(dir) : [];
-  assert.equal(backup.length, 0, 'refusing to run: the real .mavis-inject/ is not empty');
-  fs.mkdirSync(dir, { recursive: true });
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mavis-inject-'));
   try {
     for (const [name, value] of Object.entries(entries)) fs.writeFileSync(path.join(dir, `${name}.txt`), value);
-    return fn();
+    return fn(dir);
   } finally {
-    for (const name of Object.keys(entries)) fs.rmSync(path.join(dir, `${name}.txt`), { force: true });
-    if (!preexisting) fs.rmSync(dir, { recursive: true, force: true });
+    fs.rmSync(dir, { recursive: true, force: true });
   }
 }
 
 test('the hook emits the Claude Code / Codex hook JSON shape', () => {
-  const out = withRepoInjector({ tone: 'terse, no preamble\n' }, () => runHook());
+  const out = withRepoInjector({ tone: 'terse, no preamble\n' }, (d) => runHook(d));
   const parsed = JSON.parse(out);
   assert.equal(parsed.hookSpecificOutput.hookEventName, 'UserPromptSubmit');
   assert.equal(parsed.hookSpecificOutput.additionalContext, 'TONE: terse, no preamble');
 });
 
 test('the hook emits absolutely nothing when no injector is set', () => {
-  const out = withRepoInjector({}, () => runHook());
+  const out = withRepoInjector({}, (d) => runHook(d));
   assert.equal(out, '', 'an empty additionalContext still costs JSON framing on every turn');
 });
 
 test('the hook exits 0 and stays silent on garbage stdin', () => {
   // A harness that changes its payload shape, or passes none at all, must not cost a turn.
-  const out = withRepoInjector({}, () => runHook('not json at all {{{'));
+  const out = withRepoInjector({}, (d) => runHook(d, 'not json at all {{{'));
   assert.equal(out, '');
-  const out2 = withRepoInjector({ focus: 'shipping\n' }, () => runHook(''));
+  const out2 = withRepoInjector({ focus: 'shipping\n' }, (d) => runHook(d, ''));
   assert.equal(JSON.parse(out2).hookSpecificOutput.additionalContext, 'FOCUS: shipping');
 });
 
 test('the hook never lets an injector exceed the per-turn cap', () => {
-  const out = withRepoInjector({ tone: 'q'.repeat(5000) }, () => runHook());
+  const out = withRepoInjector({ tone: 'q'.repeat(5000) }, (d) => runHook(d));
   const ctx = JSON.parse(out).hookSpecificOutput.additionalContext;
   assert.ok(ctx.length <= MAX_CONTEXT_CHARS, `hook emitted ${ctx.length} chars`);
   assert.ok(ctx.endsWith(TRUNCATION_NOTICE));
@@ -369,31 +369,29 @@ test('the hook never lets an injector exceed the per-turn cap', () => {
 
 // ---- the CLI ----
 
-function runCli(args) {
+function runCli(args, dir) {
   return execFileSync(process.execPath, [path.join(repoRoot, 'scripts', 'inject.mjs'), ...args], {
     encoding: 'utf8',
+    env: { ...process.env, MAVIS_INJECT_DIR: dir },
   });
 }
 
-test('the CLI round-trips set / list / cost / clear against the real brain root', () => {
-  const dir = injectDir(repoRoot);
-  const preexisting = fs.existsSync(dir);
-  assert.equal(preexisting ? fs.readdirSync(dir).length : 0, 0, 'refusing to run: the real .mavis-inject/ is not empty');
+test('the CLI round-trips set / list / cost / clear in an isolated directory', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mavis-inject-cli-'));
   try {
-    const set = runCli(['set', 'focus', 'the', 'payments', 'migration']);
+    const set = runCli(['set', 'focus', 'the', 'payments', 'migration'], dir);
     assert.match(set, /FOCUS: the payments migration/);
     assert.match(set, /tokens on every turn/, 'setting an injector states its per-turn cost');
 
-    assert.match(runCli(['list']), /FOCUS\s+the payments migration/);
-    const cost = runCli(['cost']);
+    assert.match(runCli(['list'], dir), /FOCUS\s+the payments migration/);
+    const cost = runCli(['cost'], dir);
     assert.match(cost, /~\d+ tokens/);
     assert.match(cost, /FOCUS: the payments migration/);
 
-    assert.match(runCli(['clear', 'focus']), /cleared FOCUS/);
-    assert.match(runCli(['list']), /No injectors set/);
+    assert.match(runCli(['clear', 'focus'], dir), /cleared FOCUS/);
+    assert.match(runCli(['list'], dir), /No injectors set/);
   } finally {
-    fs.rmSync(path.join(dir, 'focus.txt'), { force: true });
-    if (!preexisting) fs.rmSync(dir, { recursive: true, force: true });
+    fs.rmSync(dir, { recursive: true, force: true });
   }
 });
 
@@ -410,4 +408,35 @@ test('an unknown CLI command exits non-zero with usage', () => {
     () => runCli(['frobnicate']),
     (err) => err.status === 1 && /unknown command/.test(String(err.stderr || '')),
   );
+});
+
+// ---- the isolation the live-state failure taught ----
+//
+// These five subprocess tests originally drove the real `.mavis-inject/` and asserted it was empty
+// first. That guard turned "the user set an injector" into five red tests within the hour of the
+// feature going in. A guard that FAILS is still a broken suite; isolation is the fix, and the
+// override that makes isolation possible needs the same absolute-path discipline as the
+// observation system's, for the same reason.
+
+test('MAVIS_INJECT_DIR honours an absolute override and ignores anything else', () => {
+  const brain = fs.mkdtempSync(path.join(os.tmpdir(), 'mavis-inject-res-'));
+  const fallback = path.join(brain, INJECT_DIR);
+  try {
+    for (const bad of [undefined, null, '', 'undefined', 'relative/dir', './here', '..']) {
+      assert.equal(injectDir(brain, bad), fallback, `override ${JSON.stringify(bad)} must fall back`);
+    }
+    const good = path.join(os.tmpdir(), 'mavis-inject-explicit');
+    assert.equal(injectDir(brain, good), good, 'an absolute override is honoured');
+  } finally {
+    fs.rmSync(brain, { recursive: true, force: true });
+  }
+});
+
+test('the live .mavis-inject/ is never touched by the suite', () => {
+  // The regression in one assertion: whatever the user has set stays set.
+  const live = injectDir(repoRoot, null);
+  const before = fs.existsSync(live) ? fs.readdirSync(live).sort() : null;
+  withRepoInjector({ tone: 'scratch\n' }, (d) => runHook(d));
+  const after = fs.existsSync(live) ? fs.readdirSync(live).sort() : null;
+  assert.deepEqual(after, before, 'running the suite must not add, remove or alter live injectors');
 });
