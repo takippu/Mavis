@@ -27,6 +27,12 @@ _backup/
 # The shipped template is `.mavis-private.example`.
 /.mavis-private
 
+# Runtime state for the injector and observation systems. Both are per-user by definition:
+# .mavis-inject holds your current working register (tone/mood/focus), and .mavis-observations
+# is a log of your own tool calls. Neither belongs to anyone else's clone.
+/.mavis-inject/
+/.mavis-observations/
+
 # Local-only / per-machine
 workspace/
 .superpowers/

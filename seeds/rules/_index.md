@@ -25,3 +25,13 @@
 **Triggers:** how i talk, how you talk, talk to me, adapt, register, conversational style, my style, tone, mirror, match my vibe, casual, terse, formal, how i converse, learn how i talk, communication style, how should you talk
 **Summary:** Match the user's register each turn (length/formality/slang/energy) in Mavis's own voice; update the Observed-style note in communication.md when it durably shifts.
 **Detail:** [_details/adapt-to-user-register.md](_details/adapt-to-user-register.md)
+
+## decision-log
+**Triggers:** decision, decisions, decision log, decisions.md, why did we, why did i, why was, why we chose, why not, what did we decide, rationale, reasoning, tradeoff, trade-off, alternatives, options considered, rejected, revisit, reconsider, reopen, adr, architecture decision record, precedent, prior decision, second-guess
+**Summary:** Non-obvious calls append to `projects/<slug>/decisions.md` (date / Context / Chose / Rejected+why / Revisit-if / Trail) — append-only, never edited, supersede with a new section; read on demand, never at boot.
+**Detail:** [_details/decision-log.md](_details/decision-log.md)
+
+## session-briefing
+**Triggers:** session briefing, briefing, brief me, boot brief, session start, start of session, where were we, where did we leave off, what was i working on, what was i doing, catch me up, catch up, recap, what's in flight, in flight, stale project, resume work, pick up where
+**Summary:** At session start, after auto-load and before the first answer, emit <=8 lines (hard cap 12) built ONLY from the projects router `Now:` lines + today's daily-memory headings — zero new reads, no invented status, cap 3 projects, silence when there is nothing worth saying.
+**Detail:** [_details/session-briefing.md](_details/session-briefing.md)
