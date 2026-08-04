@@ -126,7 +126,7 @@
     if (!r || r.kind === 'error') { flow.state = 'error'; flow.error = (r && r.error) || 'no response'; return paint(); }
     if (r.kind === 'ask') { flow.state = 'asking'; flow.sessionId = r.sessionId; flow.questions = r.questions; flow.note = r.note; flow.answers = {}; return paint(); }
     if (r.kind === 'done') { flow.state = 'review'; flow.composed = { concise: r.text || '', detailed: r.textDetailed || r.text || '' }; flow.detailed = false; flow.draft = flow.composed.concise; flow.manual = false; return paint(); }
-    if (r.kind === 'message') { flow.state = 'error'; flow.error = 'Claude didn’t return a usable block:\n' + (r.text || '').slice(0, 400); return paint(); }
+    if (r.kind === 'message') { flow.state = 'error'; flow.error = 'The DailyOps agent didn’t return a usable control block:\n' + (r.text || '').slice(0, 400); return paint(); }
     flow.state = 'error'; flow.error = 'unexpected response'; return paint();
   }
 

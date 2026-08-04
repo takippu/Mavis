@@ -159,6 +159,46 @@ test('parseControl is robust to a stray marker in prose and a marker inside JSON
   assert.strictEqual(agent.parseControl('<<<ASK>>>{not json}<<<END>>>').kind, 'error');
 });
 
+test('Codex DailyOps runs outside the brain contract and receives memory contents inline', () => {
+  const brain = brainWith({});
+  fs.mkdirSync(path.join(brain, 'daily-memories'));
+  fs.writeFileSync(path.join(brain, 'daily-memories', '2026-06-23.md'),
+    '# Monday\n\n## bluebird — shipped search\n');
+  fs.writeFileSync(path.join(brain, 'daily-memories', '2026-06-24.md'),
+    '# Tuesday\n\n## bluebird — continue polish\n');
+  const appData = 'C:\\Users\\Ada\\AppData\\Mavis';
+  assert.deepStrictEqual(agent.executionContext(brain, 'codex', appData), {
+    cwd: path.join(appData, 'dailyops-agent'),
+    inlineMemories: true,
+    skipGitRepoCheck: true,
+    readRoot: null,
+    promptOnStdin: true,
+  });
+  assert.deepStrictEqual(agent.executionContext(brain, 'claude', appData), {
+    cwd: brain,
+    inlineMemories: false,
+    skipGitRepoCheck: false,
+    readRoot: null,
+    promptOnStdin: false,
+  });
+
+  const prompt = agent.buildStartPrompt(brain, '2026-06-24', '0,6', { inlineMemories: true });
+  assert.match(prompt, /application-internal protocol turn/);
+  assert.match(prompt, /<daily-memory path="daily-memories\/2026-06-24\.md">/);
+  assert.match(prompt, /continue polish/);
+  assert.doesNotMatch(prompt, /Read these daily-memory files/);
+});
+
+test('the observed Codex human-facing standup reply remains a protocol miss', () => {
+  const observed = [
+    'Which was your last actual working day?',
+    '',
+    'Reply like: `Monday; Project A, Project B`',
+  ].join('\n');
+  const parsed = agent.parseControl(observed);
+  assert.deepStrictEqual(parsed, { kind: 'message', text: observed });
+});
+
 test('rowsToLines coerces a single-object row and array work (LLM shape deviations)', () => {
   const t1 = dailyops.composeStandup({ name: 'T', date: '2026-06-24', previous: [], issues: [], todayRows: { project: 'X', work: 'do it' } });
   assert.match(t1, /Today\n      - X : do it\n/);

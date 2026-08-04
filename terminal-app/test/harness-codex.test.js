@@ -25,13 +25,21 @@ test('resolveBin selects .cmd shim from where codex output (Windows preference)'
 
 test('permissionArgs maps the four Mavis modes onto sandbox + approval policy', () => {
   assert.deepStrictEqual(codex.permissionArgs('default'),
-    ['--sandbox', 'workspace-write', '--approval-policy', 'on-request']);
+    ['--sandbox', 'workspace-write', '--ask-for-approval', 'on-request']);
   assert.deepStrictEqual(codex.permissionArgs('acceptEdits'),
-    ['--sandbox', 'workspace-write', '--approval-policy', 'on-failure']);
+    ['--sandbox', 'workspace-write', '--ask-for-approval', 'on-request']);
   assert.deepStrictEqual(codex.permissionArgs('plan'),
-    ['--sandbox', 'read-only', '--approval-policy', 'untrusted']);
+    ['--sandbox', 'read-only', '--ask-for-approval', 'untrusted']);
   assert.deepStrictEqual(codex.permissionArgs('yolo'),
     ['--dangerously-bypass-approvals-and-sandbox']);
+});
+
+test('permissionArgs never emits Codex 0.146 removed approval syntax', () => {
+  for (const mode of ['default', 'acceptEdits', 'plan', 'yolo']) {
+    const args = codex.permissionArgs(mode);
+    assert.ok(!args.includes('--approval-policy'), `${mode} uses removed --approval-policy`);
+    assert.ok(!args.includes('on-failure'), `${mode} uses removed on-failure policy`);
+  }
 });
 
 test('permissionArgs rejects auto and unknown values back to default', () => {
@@ -41,19 +49,30 @@ test('permissionArgs rejects auto and unknown values back to default', () => {
 
 test('ptyCommand injects hook config via -c overrides, not a project-local config file', () => {
   const c = codex.ptyCommand({ binPath: 'c.exe', permissionMode: 'default', hookCommand: 'node "C:/u/e.js" tok' });
-  const i = c.args.indexOf('-c');
-  assert.ok(i >= 0, 'uses a -c override');
+  assert.ok(c.args.includes('--dangerously-bypass-hook-trust'), 'runs the app-vetted generated hook without a per-pane trust prompt');
+  const overrides = [];
+  for (let i = 0; i < c.args.length; i++) if (c.args[i] === '-c') overrides.push(c.args[i + 1]);
+  assert.strictEqual(overrides.length, 3, 'registers the three status lifecycle events');
   // -c overrides are user-supplied and therefore NOT subject to the project trust gate, which is
   // the entire reason we do not write a project-local .codex/config.toml.
-  assert.match(c.args[i + 1], /^hooks\./, 'override targets the hooks table');
-  assert.ok(c.args[i + 1].includes('e.js'), 'carries the emitter command');
+  assert.deepStrictEqual(overrides.map((s) => s.match(/^hooks\.([^=]+)/)[1]),
+    ['Stop', 'PermissionRequest', 'PreToolUse']);
+  for (const value of overrides) {
+    assert.match(value, /=\[\{hooks=\[\{type="command",command=/, 'uses Codex 0.146 matcher-group shape');
+    assert.ok(value.includes('e.js'), 'carries the emitter command');
+  }
+});
+
+test('ptyCommand adds no hook-trust bypass when no Mavis hook is injected', () => {
+  const c = codex.ptyCommand({ binPath: 'c.exe', permissionMode: 'default' });
+  assert.ok(!c.args.includes('--dangerously-bypass-hook-trust'));
 });
 
 test('headlessCommand reuses ptyCommand UNCHANGED — codex still needs sandbox/approval flags headlessly (Finding 1, 2026-07-26 review, deliberately not touched)', () => {
   const h = codex.headlessCommand({ binPath: 'c.exe', permissionMode: 'plan' });
   const p = codex.ptyCommand({ binPath: 'c.exe', permissionMode: 'plan' });
   assert.deepStrictEqual(h, p, 'headlessCommand delegates straight to ptyCommand, no divergence');
-  assert.deepStrictEqual(h.args, ['--sandbox', 'read-only', '--approval-policy', 'untrusted']);
+  assert.deepStrictEqual(h.args, ['--sandbox', 'read-only', '--ask-for-approval', 'untrusted']);
 });
 
 test('headlessArgs passes the prompt as a positional arg, not stdin', () => {
@@ -75,6 +94,26 @@ test('headlessArgs falls back to a single-turn run when no session id was ever a
   assert.deepStrictEqual(next.args.slice(0, 2), ['exec', '--json'], 'no resume without an id, no crash');
 });
 
+test('headlessArgs supports an isolated non-git DailyOps cwd with a large stdin prompt', () => {
+  const first = codex.headlessArgs({
+    prompt: 'dailyops\n' + 'x'.repeat(40000), skipGitRepoCheck: true, promptOnStdin: true,
+  });
+  assert.deepStrictEqual(first.args, [
+    'exec', '--json', '--skip-git-repo-check', '-',
+  ]);
+  assert.match(first.stdin, /^dailyops\n/);
+  assert.ok(first.stdin.length > 40000);
+
+  const resumed = codex.headlessArgs({
+    prompt: 'answers', sessionId: 'thr_9', resume: true,
+    skipGitRepoCheck: true, promptOnStdin: true,
+  });
+  assert.deepStrictEqual(resumed.args, [
+    'exec', 'resume', 'thr_9', '--json', '--skip-git-repo-check', '-',
+  ]);
+  assert.strictEqual(resumed.stdin, 'answers');
+});
+
 test('a resume with no assigned id degrades to a fresh run rather than throwing', () => {
   assert.doesNotThrow(() => codex.headlessArgs({ prompt: 'x', sessionId: undefined, resume: true }));
   const a = codex.headlessArgs({ prompt: 'x', sessionId: undefined, resume: true });
@@ -93,6 +132,11 @@ test('parseEvent understands the observed exec --json vocabulary', () => {
   const err = codex.parseEvent(JSON.stringify({ type: 'error', message: 'boom' }));
   assert.strictEqual(err.isError, true);
   assert.strictEqual(err.text, 'boom');
+
+  const current = codex.parseEvent(JSON.stringify({
+    type: 'item.completed', item: { id: 'item_0', type: 'agent_message', text: 'current answer' },
+  }));
+  assert.strictEqual(current.text, 'current answer');
 });
 
 test('parseEvent ignores unknown event types and junk without throwing', () => {

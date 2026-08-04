@@ -524,12 +524,12 @@ ipcMain.handle('dailyops:save', async (_e, input) => {
 });
 // Agent-driven generation (headless CLI, read-only; harness follows cfg.HARNESS) — returns ask/done/message/error.
 ipcMain.handle('dailyops:gen-start', async (_e, date) => {
-  try { return await dailyopsAgent.genStart(cfg.BRAIN_ROOT, typeof date === 'string' ? date : undefined, cfg.DAILYOPS_OFF_DAYS, cfg.HARNESS); }
+  try { return await dailyopsAgent.genStart(cfg.BRAIN_ROOT, typeof date === 'string' ? date : undefined, cfg.DAILYOPS_OFF_DAYS, cfg.HARNESS, userDataDir); }
   catch (e) { return { kind: 'error', error: e.message }; }
 });
 ipcMain.handle('dailyops:gen-continue', async (_e, payload) => {
   if (!payload || typeof payload !== 'object') return { kind: 'error', error: 'bad-input' };
-  try { return await dailyopsAgent.genContinue(cfg.BRAIN_ROOT, payload.date, payload.sessionId, payload.answers || {}, cfg.HARNESS); }
+  try { return await dailyopsAgent.genContinue(cfg.BRAIN_ROOT, payload.date, payload.sessionId, payload.answers || {}, cfg.HARNESS, userDataDir); }
   catch (e) { return { kind: 'error', error: e.message }; }
 });
 

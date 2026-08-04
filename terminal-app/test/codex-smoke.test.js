@@ -73,7 +73,7 @@ test('codex accepts a nested -c hooks override on the command line', { skip: SKI
   // does not reject it either, this method cannot distinguish "accepted" from "codex accepts
   // anything here", and the test says so loudly instead of reporting a pass it cannot justify.
   const good = codex.hookOverrides('node "C:/tmp/e.js" tok');
-  const bad = ['-c', 'hooks.stop.command='];
+  const bad = ['-c', 'hooks.Stop=[{'];
   const run = (extra) => spawnSync(BIN, extra.concat(['exec', '--json', 'hi']),
     { encoding: 'utf8', shell: process.platform === 'win32', timeout: 25000 });
   const rGood = run(good);
@@ -105,13 +105,21 @@ test('a real codex run lands a normalized line in the sidecar', { skip: SKIP, ti
   try {
     sessionEvents.ensure(dir);
     const token = 'smoketoken';
-    const cfgArgs = codex.hookOverrides(sessionEvents.buildHookCommand(sessionEvents.emitterPath(dir), token));
-    const r = spawnSync(BIN, cfgArgs.concat(['exec', '--json', 'reply with the single word ok']), {
+    const hookCommand = sessionEvents.buildHookCommand(
+      sessionEvents.emitterPath(dir), token, sessionEvents.eventsDir(dir));
+    // Use the SAME Windows shim wrapper + headless argument builders as the app. Spawning the .cmd
+    // shim through shell:true splits a spaced prompt into stray CLI arguments ("unexpected argument
+    // 'with'"), so that old smoke never reached a turn and misreported the missing sidecar as a hook
+    // failure. The scratch dir is intentionally not a git repo; skip only that unrelated guard.
+    const cmd = codex.headlessCommand({ binPath: BIN, hookCommand, permissionMode: 'plan' });
+    const h = codex.headlessArgs({ prompt: 'reply with the single word ok' });
+    h.args.splice(1, 0, '--skip-git-repo-check');
+    const r = spawnSync(cmd.file, cmd.args.concat(h.args), {
       // cwd isolation matches test 3's: without it the real repo's own AGENTS.md contract would
       // load into the prompt here too. Harmless to this test's assertion (sidecar plumbing, not
       // reply content) but inconsistent, and there is no reason to leave it depending on where
       // the test happens to run from.
-      cwd: dir, encoding: 'utf8', shell: process.platform === 'win32', timeout: 110000,
+      cwd: dir, encoding: 'utf8', timeout: 110000,
       env: { ...process.env, MAVIS_EVENTS_DIR: sessionEvents.eventsDir(dir) },
     });
 
@@ -120,6 +128,10 @@ test('a real codex run lands a normalized line in the sidecar', { skip: SKIP, ti
       // smoke is most likely to actually hit, and it must read as "not proven", never as green.
       assert.fail('codex auth expired -- run `codex login`. NOT a pass.');
     }
+
+    assert.notStrictEqual(r.status, null, 'codex hung: ' + String(r.error && r.error.message || 'timeout'));
+    assert.strictEqual(r.status, 0,
+      'codex failed before the hook could fire: ' + (String(r.stderr || r.stdout || '').slice(0, 600) || 'no output'));
 
     const f = path.join(sessionEvents.eventsDir(dir), token + '.jsonl');
     assert.ok(fs.existsSync(f), 'no sidecar file: the hook never fired');

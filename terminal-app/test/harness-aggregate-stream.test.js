@@ -28,6 +28,16 @@ test('captures the server-assigned id from thread.started and the completion tex
   assert.strictEqual(agg.error, null);
 });
 
+test('captures Codex 0.146 nested item.completed agent text', () => {
+  const out = jsonl(
+    { type: 'thread.started', thread_id: 'thr_146' },
+    { type: 'item.completed', item: { id: 'item_0', type: 'agent_message', text: 'nested answer' } },
+    { type: 'turn.completed', usage: { input_tokens: 10, output_tokens: 2 } },
+  );
+  const agg = aggregateStreamedTurn(codex, out);
+  assert.deepStrictEqual(agg, { sessionId: 'thr_146', text: 'nested answer', error: null });
+});
+
 test('no thread.started anywhere in the stream resolves sessionId to null, not a leaked caller id', () => {
   // Only turn.started + a normal completion — the exact stream shape behind the 2026-07-26 bug.
   // A caller that mixed its own uuid into this aggregation would have surfaced it here instead

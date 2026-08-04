@@ -1,6 +1,6 @@
 {
   "name": "mavis-terminal",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "private": true,
   "description": "Desktop shell that loads Mavis on launch — embeds Claude Code or Codex with a harness-aware Mavis autorun command + a read-only project sidebar.",
   "license": "MIT",

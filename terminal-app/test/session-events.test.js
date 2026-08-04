@@ -38,19 +38,18 @@ test('emitter normalizes BOTH harness vocabularies into one set of states', () =
   emit(p, 'tokA', { hook_event_name: 'Stop' }, evDir);
   emit(p, 'tokA', { hook_event_name: 'StopFailure' }, evDir);
   emit(p, 'tokA', { hook_event_name: 'Notification', notification_type: 'permission_prompt' }, evDir);
-  emit(p, 'tokA', { hook_event_name: 'PreToolUse' }, evDir);
 
   // Codex vocabulary
-  emit(p, 'tokB', { hook_event_name: 'stop' }, evDir);
-  emit(p, 'tokB', { hook_event_name: 'permission_request' }, evDir);
-  emit(p, 'tokB', { hook_event_name: 'pre_tool_use' }, evDir);
+  emit(p, 'tokB', { hook_event_name: 'PreToolUse' }, evDir);
+  emit(p, 'tokB', { hook_event_name: 'PermissionRequest' }, evDir);
+  emit(p, 'tokB', { hook_event_name: 'Stop' }, evDir);
 
   const a = fs.readFileSync(path.join(evDir, 'tokA.jsonl'), 'utf8').trim().split('\n').map(JSON.parse);
-  assert.deepStrictEqual(a.map((x) => x.state), ['done', 'error', 'await', 'busy']);
+  assert.deepStrictEqual(a.map((x) => x.state), ['done', 'error', 'await']);
 
   const b = fs.readFileSync(path.join(evDir, 'tokB.jsonl'), 'utf8').trim().split('\n').map(JSON.parse);
   // Codex has NO StopFailure analogue — 'error' is derived from pty exit, never emitted here.
-  assert.deepStrictEqual(b.map((x) => x.state), ['done', 'await', 'busy']);
+  assert.deepStrictEqual(b.map((x) => x.state), ['busy', 'await', 'done']);
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
@@ -118,7 +117,7 @@ test('hookSpawnConfig gives claude a settings file and codex a command string', 
 // Notification set already drives 'busy' via the existing onData/isWorking scan. Pre-branch
 // mavis-hooks.js registered only Stop, StopFailure and Notification; this pins that back down.
 // See Finding 3, 2026-07-26 whole-branch review.
-test('hookSpawnConfig never registers PreToolUse for claude (it is blocking, unlike Codex\'s pre_tool_use)', () => {
+test('hookSpawnConfig never registers PreToolUse for claude (it is blocking, unlike Codex\'s PreToolUse)', () => {
   const dir = mkdir();
   sessionEvents.ensure(dir);
   const c = sessionEvents.hookSpawnConfig('claude', 'tokPTU', dir);
@@ -129,12 +128,13 @@ test('hookSpawnConfig never registers PreToolUse for claude (it is blocking, unl
   // Codex's own mechanism, by contrast, DOES still cover pre_tool_use (its only status channel):
   // hookSpawnConfig('codex', ...) hands back just the raw emitter command string (no event names —
   // those get woven in one layer up, by codex.js's hookOverrides, when ptyCommand actually spawns).
-  // Asserting THAT still includes pre_tool_use, so the two harnesses' divergence is explicit rather
+  // Asserting THAT still includes PreToolUse, so the two harnesses' divergence is explicit rather
   // than "claude lacks a key nobody checked".
   const x = sessionEvents.hookSpawnConfig('codex', 'tokPTU2', dir);
   const codexAdapter = require('../src/harness/codex');
-  const overrides = codexAdapter.hookOverrides(x.hookCommand).join(' ');
-  assert.ok(overrides.includes('pre_tool_use'), 'codex still relies on pre_tool_use for busy state');
+  const overrides = codexAdapter.hookOverrides(x.hookCommand);
+  assert.ok(overrides.join(' ').includes('hooks.PreToolUse='), 'codex still relies on PreToolUse for busy state');
+  assert.ok(overrides.includes('--dangerously-bypass-hook-trust'), 'generated per-pane hook bypasses hash trust only');
   fs.rmSync(dir, { recursive: true, force: true });
 });
 

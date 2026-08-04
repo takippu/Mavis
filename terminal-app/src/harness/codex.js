@@ -2,21 +2,20 @@
 
 // OpenAI Codex adapter. Same interface as ./claude, Codex's vocabulary.
 //
-// All flags verified against codex-cli 0.128.0 by string inspection of the shipped binary; the
-// exec --json event names were observed live from a probe run on 2026-07-25. Both are
-// version-dependent facts, not guarantees — re-verify on upgrade.
+// Permission flags were re-verified against codex-cli 0.146.0 via the installed CLI parser and
+// current OpenAI Codex manual on 2026-08-04. The exec --json event names were observed live from a
+// probe run on 2026-07-25. Both are version-dependent facts, not guarantees — re-verify on upgrade.
 
 const { execSync } = require('child_process');
 const { pickBinLine } = require('./claude');
 
-// Claude gates on WHAT KIND of action it is; Codex gates on WHETHER THE SANDBOX REFUSED it. There
-// is no exact correspondence, so acceptEdits -> on-failure is a judgement call: edits inside the
-// workspace proceed without prompting, anything the sandbox blocks still escalates. This is the one
-// mapping where a Codex session will feel materially different from a Claude one.
+// Claude gates on WHAT KIND of action it is; Codex combines a sandbox boundary with an approval
+// policy. There is no exact acceptEdits equivalent in Codex 0.146: the old on-failure value was
+// removed, so acceptEdits falls back to the safest remaining interactive policy, on-request.
 const PERM_MAP = {
-  default: ['--sandbox', 'workspace-write', '--approval-policy', 'on-request'],
-  acceptEdits: ['--sandbox', 'workspace-write', '--approval-policy', 'on-failure'],
-  plan: ['--sandbox', 'read-only', '--approval-policy', 'untrusted'],
+  default: ['--sandbox', 'workspace-write', '--ask-for-approval', 'on-request'],
+  acceptEdits: ['--sandbox', 'workspace-write', '--ask-for-approval', 'on-request'],
+  plan: ['--sandbox', 'read-only', '--ask-for-approval', 'untrusted'],
   yolo: ['--dangerously-bypass-approvals-and-sandbox'],
 };
 
@@ -41,9 +40,16 @@ function permissionArgs(mode) {
 // not subject to that gate, so sessions work in any directory with no trust dance.
 function hookOverrides(hookCommand) {
   if (!hookCommand) return [];
-  const out = [];
-  for (const ev of ['stop', 'permission_request', 'pre_tool_use']) {
-    out.push('-c', `hooks.${ev}.command=${JSON.stringify(hookCommand)}`);
+  // Codex 0.146 uses the same PascalCase event names and three-level matcher-group shape as
+  // hooks.json. The old lowercase hooks.<event>.command keys are accepted as generic config but
+  // ignored by the hook loader, which left every session sidecar empty with no startup error.
+  const group = `[{hooks=[{type="command",command=${JSON.stringify(hookCommand)}}]}]`;
+  // This hook is generated and vetted by Mavis-Terminal itself. Its command includes a per-pane
+  // token, so its hash changes on every spawn and cannot use Codex's persisted one-time trust.
+  // The bypass is intentionally hook-only: sandbox and command approval policy remain unchanged.
+  const out = ['--dangerously-bypass-hook-trust'];
+  for (const ev of ['Stop', 'PermissionRequest', 'PreToolUse']) {
+    out.push('-c', `hooks.${ev}=${group}`);
   }
   return out;
 }
@@ -66,9 +72,9 @@ function ptyCommand({ binPath, hookCommand, permissionMode } = {}) {
 
 // Headless spawn (brain-chat.js / dailyops-agent.js). Unlike Claude, `codex exec` has no TTY to
 // approve anything even outside the interactive TUI path, so it still needs explicit sandbox +
-// approval-policy flags — ptyCommand's mapping is reused here UNCHANGED. Do not fold this into
+// approval flags — ptyCommand's mapping is reused here UNCHANGED. Do not fold this into
 // Claude's headlessCommand or otherwise touch the plan -> sandbox read-only + approval untrusted
-// mapping: whether headless 'plan' should instead map to --approval-policy never (no TTY exists to
+// mapping: whether headless 'plan' should instead map to --ask-for-approval never (no TTY exists to
 // answer an approval prompt) is an open question already with the user — see Finding 1, 2026-07-26
 // whole-branch review. This function exists only so brain-chat/dailyops can call the SAME method
 // name (`adapter.headlessCommand`) on both adapters without a harness-specific branch.
@@ -78,14 +84,23 @@ function headlessCommand({ binPath, hookCommand, permissionMode } = {}) {
 
 // codex exec takes the prompt POSITIONALLY (not on stdin) and streams JSONL, so callers parse line
 // by line rather than once over the whole stdout.
-function headlessArgs({ prompt, sessionId, resume } = {}) {
+function headlessArgs({ prompt, sessionId, resume, skipGitRepoCheck, addDir, promptOnStdin } = {}) {
   // Resume needs a server-assigned id. Without one we fall back to a fresh single-turn run rather
   // than crashing — losing context is recoverable, a hard failure mid-conversation is not.
   const args = resume && sessionId
     ? ['exec', 'resume', sessionId, '--json']
     : ['exec', '--json'];
-  args.push(String(prompt == null ? '' : prompt));
-  return { args, stdin: null, streaming: true };
+  // DailyOps runs Codex from an app-owned directory so the brain's project AGENTS.md cannot
+  // intercept its private ASK/DONE wire protocol. That directory is deliberately not a git repo;
+  // the app embeds the selected memory sources in the prompt instead of exposing the brain root.
+  if (skipGitRepoCheck) args.push('--skip-git-repo-check');
+  if (addDir && !(resume && sessionId)) args.push('--add-dir', String(addDir));
+  const value = String(prompt == null ? '' : prompt);
+  // Large application-owned prompts (DailyOps embeds the selected memory contents) use stdin.
+  // Besides avoiding Windows' command-line length ceiling, the explicit '-' keeps parsing
+  // unambiguous when the prompt itself contains paths, quotes, or control markers.
+  args.push(promptOnStdin ? '-' : value);
+  return { args, stdin: promptOnStdin ? value : null, streaming: true };
 }
 
 function parseEvent(line) {
@@ -96,9 +111,16 @@ function parseEvent(line) {
   if (!j || typeof j !== 'object') return null;
   const type = String(j.type || '');
   const isError = type === 'turn.failed' || type === 'error';
+  // Codex 0.146 emits assistant output as:
+  // { type: 'item.completed', item: { type: 'agent_message', text: '...' } }
+  // Older probes exposed text at the top level, so keep both shapes. Dropping the nested shape
+  // made every successful 0.146 headless turn resolve with an empty string.
+  const itemText = type === 'item.completed' && j.item && j.item.type === 'agent_message'
+    ? j.item.text
+    : null;
   const text = isError
     ? String((j.error && j.error.message) || j.message || 'codex error')
-    : String(j.text || j.message || '');
+    : String(itemText || j.text || j.message || '');
   return {
     type,
     text,

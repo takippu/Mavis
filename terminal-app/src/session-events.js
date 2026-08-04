@@ -37,8 +37,9 @@ function isValidToken(token) {
   return typeof token === 'string' && new RegExp(TOKEN_PATTERN).test(token);
 }
 
-// One emitter, both vocabularies. Claude's event names are PascalCase, Codex's are snake_case, and
-// they do not overlap, so a single lookup table serves both with no harness flag needed.
+// One emitter, both vocabularies. Current Claude and Codex hooks share PascalCase names for Stop
+// and PreToolUse; Claude additionally emits StopFailure/Notification while Codex uses
+// PermissionRequest. A single lookup table still serves both with no harness flag needed.
 //
 // Codex has NO StopFailure analogue: an errored turn is derived from the pty exit code instead.
 // Stated rather than papered over.
@@ -53,7 +54,7 @@ const fs = require('fs');
 const path = require('path');
 const STATES = {
   Stop: 'done', StopFailure: 'error', PreToolUse: 'busy',
-  stop: 'done', permission_request: 'await', pre_tool_use: 'busy',
+  PermissionRequest: 'await',
 };
 let raw = '';
 process.stdin.on('data', function (d) { raw += d; });

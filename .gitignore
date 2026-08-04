@@ -23,6 +23,12 @@ _backup/
 # no licence to redistribute. Ignored rather than deleted — nothing is lost, it just does not ship.
 /_local/
 
+# Third-party skill kept local so its trigger resolves, but this repo has no licence to
+# redistribute it (the "by Alex Labat" seo-geo-aeo SEO/GEO/AEO audit skill). Restored from git
+# history (commit 14f9622); if it goes missing again, recover with:
+#   git show 14f9622:skills/seo-geo-aeo/SKILL.md > skills/seo-geo-aeo/SKILL.md
+/skills/seo-geo-aeo/
+
 # Leak-guard tuning: names your clients, promo codes and internal hosts, so it is itself personal.
 # The shipped template is `.mavis-private.example`.
 /.mavis-private
