@@ -10,12 +10,12 @@ const path = require('path');
 const SCHEMA = {
   brainRoot: { type: 'string', label: 'Brain folder', applies: 'restart', default: '' },
   // Blank is the RIGHT value here, not a missing one: config.js then picks each pane's own built-in
-  // (/mavis for Claude, /prompts:mavis for Codex). Pinning either literal made the other harness's
+  // (/mavis for Claude, $mavis for Codex). Pinning either literal made the other harness's
   // panes autorun a command their CLI does not have, so config.js now ignores a value that matches
   // any harness built-in — only a genuinely custom command survives, and it applies to both.
   autorunCommand: {
     type: 'string', label: 'Autorun command', applies: 'restart', default: '',
-    placeholder: 'blank = per-agent default (/mavis, Codex /prompts:mavis)',
+    placeholder: 'blank = per-agent default (/mavis, Codex $mavis)',
   },
   autorunDelayMs: { type: 'number', label: 'Autorun delay (ms)', applies: 'restart', default: 1500, clamp: [0, 10000] },
   // How embedded Mavis sessions run re: permissions. 'yolo' maps to --dangerously-skip-permissions in

@@ -53,7 +53,8 @@ live agent configuration, which lives **outside this repo**:
 | `~/.claude/CLAUDE.md` | the always-on invariants, only with `--global` |
 | `~/.codex/AGENTS.md` | the same, for Codex, only with `--global` |
 | `~/.claude/commands/mavis.md` | the `/mavis` prompt |
-| `~/.codex/prompts/mavis.md` | the same, for Codex |
+| `~/.agents/skills/mavis/SKILL.md` | the native Codex skill for `$mavis` and implicit `mavis <project>` activation |
+| `~/.codex/prompts/mavis.md` | the deprecated `/prompts:mavis` compatibility prompt, rendered from the skill source |
 | `~/.claude/output-styles/…` | the optional terse output style |
 
 Because those are live config files and not repo files, the installer is built defensively.

@@ -53,6 +53,21 @@ test('emitter normalizes BOTH harness vocabularies into one set of states', () =
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
+test('emitter carries harness session metadata for exact transcript correlation', () => {
+  const dir = mkdir();
+  const p = sessionEvents.ensure(dir);
+  const evDir = sessionEvents.eventsDir(dir);
+  emit(p, 'tokMeta', {
+    hook_event_name: 'Stop',
+    session_id: 'session-123',
+    transcript_path: 'C:/safe/transcript.jsonl',
+  }, evDir);
+  const row = JSON.parse(fs.readFileSync(path.join(evDir, 'tokMeta.jsonl'), 'utf8').trim());
+  assert.strictEqual(row.sessionId, 'session-123');
+  assert.strictEqual(row.transcriptPath, 'C:/safe/transcript.jsonl');
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
 test('emitter ignores events it has no state for, and never creates an empty file', () => {
   const dir = mkdir();
   const p = sessionEvents.ensure(dir);
@@ -227,6 +242,20 @@ test('reader emits each appended line exactly once, tracking byte offsets', asyn
   reader._tick();
   assert.strictEqual(got.length, 2, 'a tick with no new bytes emits nothing');
   assert.strictEqual(got[0].token, 'tok1', 'token comes from the filename');
+  reader.stop();
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('reader forwards transcript metadata without trusting it as a path itself', () => {
+  const dir = mkdir();
+  sessionEvents.ensure(dir);
+  const f = path.join(sessionEvents.eventsDir(dir), 'tokMetaRead.jsonl');
+  const got = [];
+  const reader = sessionEvents.createReader({ userDataDir: dir, onState: (s) => got.push(s) });
+  fs.writeFileSync(f, JSON.stringify({ state: 'done', sessionId: 'thread-7', transcriptPath: 'C:/candidate.jsonl' }) + '\n');
+  reader._tick();
+  assert.strictEqual(got[0].sessionId, 'thread-7');
+  assert.strictEqual(got[0].transcriptPath, 'C:/candidate.jsonl');
   reader.stop();
   fs.rmSync(dir, { recursive: true, force: true });
 });

@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Slideshow campaign template</title>
+  <style>
+    :root { --h: 1920px; --pad: 76px; --paper: #f4eee7; --ink: #302725; --accent: #9b2941; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; width: 1080px; height: var(--h); overflow: hidden; }
+    body { font-family: Arial, Helvetica, sans-serif; color: var(--ink); }
+    body.threads { --h: 1350px; --pad: 66px; }
+    .slide { display: none; position: relative; width: 1080px; height: var(--h); padding: var(--pad); overflow: hidden; background: var(--paper); }
+    .slide.on { display: block; }
+    .brand { position: absolute; top: var(--pad); right: var(--pad); display: flex; align-items: center; gap: 14px; color: var(--accent); font-weight: 800; letter-spacing: .22em; }
+    .brand img { width: 34px; height: 34px; object-fit: contain; }
+    .index { color: #827571; letter-spacing: .15em; }
+    .copy { position: absolute; left: var(--pad); right: var(--pad); top: 260px; }
+    .kicker { color: var(--accent); font-size: 22px; font-weight: 800; letter-spacing: .2em; text-transform: uppercase; }
+    h1 { margin: 24px 0 0; max-width: 900px; font-size: 106px; line-height: .96; letter-spacing: -.05em; }
+    .threads .copy { top: 190px; }
+    .threads h1 { font-size: 78px; }
+    .visual { position: absolute; left: var(--pad); right: var(--pad); bottom: 80px; height: 850px; border-radius: 36px; overflow: hidden; background: #d8ccc2; }
+    .threads .visual { height: 560px; bottom: 50px; }
+    .visual img { width: 100%; height: 100%; object-fit: cover; }
+  </style>
+</head>
+<body>
+  <!-- Duplicate sections and update data-campaign/data-slide. Keep the lockup transparent. -->
+  <section class="slide" data-campaign="explainer" data-slide="1">
+    <div class="index">01 / 03</div>
+    <div class="brand"><img src="assets/logo.png" alt=""><span>Brand</span></div>
+    <div class="copy"><div class="kicker">Specific tension</div><h1>Write the stopping-frame hook here.</h1></div>
+    <div class="visual"><img src="assets/hero-generated.png" alt=""></div>
+  </section>
+  <section class="slide" data-campaign="explainer" data-slide="2">
+    <div class="index">02 / 03</div>
+    <div class="brand"><img src="assets/logo.png" alt=""><span>Brand</span></div>
+    <div class="copy"><div class="kicker">Simple mechanic</div><h1>Show one idea, not a feature list.</h1></div>
+  </section>
+  <section class="slide" data-campaign="explainer" data-slide="3">
+    <div class="index">03 / 03</div>
+    <div class="brand"><img src="assets/logo.png" alt=""><span>Brand</span></div>
+    <div class="copy"><div class="kicker">Resolution</div><h1>Name the product and give one clear action.</h1></div>
+  </section>
+  <script>
+    const query = new URLSearchParams(location.search);
+    const campaign = query.get("campaign") || "explainer";
+    const slide = query.get("s") || "1";
+    const platform = query.get("platform") || "tiktok";
+    document.body.classList.add(platform);
+    document.querySelectorAll(".slide").forEach((node) => {
+      node.classList.toggle("on", node.dataset.campaign === campaign && node.dataset.slide === slide);
+      node.classList.toggle("threads", platform === "threads");
+    });
+  </script>
+</body>
+</html>
+

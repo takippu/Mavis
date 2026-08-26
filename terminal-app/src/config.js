@@ -25,15 +25,20 @@ function compute(userDataDir) {
 
   const BRAIN_ROOT = pick('brainRoot', 'MAVIS_BRAIN_ROOT', path.resolve(__dirname, '..', '..'));
   const HARNESS = harnessRegistry.normalizeId(pick('harness', 'MAVIS_HARNESS', 'claude'));
-  // Each adapter owns the slash command that loads Mavis in ITS OWN CLI (claude: /mavis,
-  // codex: /prompts:mavis). A configured override still wins — but only when it is GENUINELY
+  // Each adapter owns the native command that loads Mavis in ITS OWN CLI (Claude: /mavis,
+  // Codex: $mavis). A configured override still wins — but only when it is GENUINELY
   // custom. A configured value that IS some harness's built-in command is not a preference, it is a
   // leftover from when that harness owned the pane, so it is ignored in favour of the built-in for
   // the harness actually being launched. Passing it through instead types a command the CLI does not
   // have: on 2026-07-30 settings.json held autorunCommand '/prompts:mavis' with harness 'claude',
   // and every Claude pane autoran it, answering "Unknown command: /prompts:mavis" plus a stray
   // "Args from unknown skill: <project>" from the label main.js appends.
-  const builtinAutorun = new Set(harnessRegistry.ids.map((id) => harnessRegistry.get(id).autorunCommand));
+  const builtinAutorun = new Set([
+    ...harnessRegistry.ids.map((id) => harnessRegistry.get(id).autorunCommand),
+    // Codex used this deprecated compatibility prompt before the native skill shipped. Treat a
+    // persisted value as migration residue, not a user-authored custom override.
+    '/prompts:mavis',
+  ]);
   const autorunCommandForHarness = (harness) => {
     const builtin = harnessRegistry.get(harnessRegistry.normalizeId(harness)).autorunCommand;
     const configured = pick('autorunCommand', 'MAVIS_AUTORUN_COMMAND', null);

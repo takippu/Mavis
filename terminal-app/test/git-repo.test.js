@@ -58,6 +58,31 @@ test('safeRel: normalizes backslashes to forward slashes for git', { skip: proce
   assert.strictEqual(gitRepo.safeRel(ROOT, 'src\\main.js'), 'src/main.js');
 });
 
+test('searchDiff finds added and removed text with its exact side and line, excluding context', () => {
+  const diff = {
+    hunks: [{ rows: [
+      { type: 'ctx', oldNum: 4, newNum: 4, oldText: 'needle context', newText: 'needle context' },
+      { type: 'del', oldNum: 5, newNum: 5, oldText: 'old needle value', newText: 'new needle value' },
+      { type: 'add', oldNum: null, newNum: 6, oldText: null, newText: 'another needle' },
+    ] }],
+  };
+  assert.deepStrictEqual(gitRepo._searchDiff(diff, 'needle', { rel: 'src/a.js', staged: false }), [
+    { rel: 'src/a.js', staged: false, side: 'old', line: 5, text: 'old needle value', type: 'del' },
+    { rel: 'src/a.js', staged: false, side: 'new', line: 5, text: 'new needle value', type: 'add' },
+    { rel: 'src/a.js', staged: false, side: 'new', line: 6, text: 'another needle', type: 'add' },
+  ]);
+});
+
+test('searchDiff is case-insensitive and honors its result limit', () => {
+  const diff = { hunks: [{ rows: [
+    { type: 'add', oldNum: null, newNum: 1, oldText: null, newText: 'Find Me' },
+    { type: 'add', oldNum: null, newNum: 2, oldText: null, newText: 'find me again' },
+  ] }] };
+  const out = gitRepo._searchDiff(diff, 'FIND ME', { rel: 'a.txt', staged: true }, 1);
+  assert.strictEqual(out.length, 1);
+  assert.strictEqual(out[0].line, 1);
+});
+
 // The ONE test here that touches the disk, because the guard it covers cannot be tested any
 // other way: the lexical checks above all PASS for a symlink/junction inside the worktree
 // that points outside it. `git status --untracked-files=all` descends a junction, so the rail

@@ -41,9 +41,10 @@ Run it yourself if you'd rather do it by hand — it's idempotent, it never over
 `_index.md`, and it verifies that every link it wrote actually resolves before exiting 0. Drop
 `--write` for a dry run, or use `--check` to ask whether seeding is still needed (exit 1 = yes).
 
-The wizard also offers to install a global `/mavis` command so you can load the brain from any
-directory, and to wire up the git hooks. Both are opt-in and both are explained before anything is
-written.
+The wizard also offers global activation so you can load the brain from any directory: `/mavis`
+under Claude Code, or plain `mavis <project>` / explicit `$mavis <project>` under Codex. The
+deprecated Codex `/prompts:mavis` command remains as a compatibility path. Activation and git-hook
+wiring are opt-in and explained before anything is written.
 
 ---
 
@@ -62,7 +63,7 @@ Mavis/
 │   ├── sync-contract.mjs      render CLAUDE.md from AGENTS.md
 │   ├── init-brain.mjs         seed a fresh brain from seeds/
 │   ├── check-leaks.mjs        find personal content in files that would be published
-│   ├── install-harness.mjs    write the invariants + /mavis into ~/.claude or ~/.codex
+│   ├── install-harness.mjs    install invariants + native Mavis activation for each harness
 │   ├── git-hooks/             commit-msg (attribution) + pre-commit (leak guard)
 │   ├── hooks/                 the write-time leak guard, run by Claude Code
 │   └── test/                  the toolchain test suite
@@ -263,7 +264,7 @@ hook runs in those repositories.
 | `setup mavis` / `run setup` | Run the setup wizard. If the brain is already set up, confirms before overwriting identity files. |
 | `reset mavis` / `reset brain` | Move `identity/`, `projects/`, `daily-memories/`, `preferences/`, `rules/`, `topics/` to `_backup/<timestamp>/` and re-seed an empty skeleton. Requires typing `CONFIRM RESET` exactly. |
 | `recalibrate mavis` / `upgrade brain` | Migrate an older brain onto the current format, backup first, legacy files kept as an inert fallback. |
-| `install mavis slash` | Install the global `/mavis` command and the compaction-proof invariants into `~/.claude/` and/or `~/.codex/`. |
+| `install mavis slash` | Install Claude's global `/mavis`, Codex's global `$mavis` skill plus compatibility prompt, and the compaction-proof invariants. |
 
 Reset never deletes — it moves to a timestamped backup folder. Restore is manual, on purpose:
 auto-restore is too easy a way to clobber the wrong thing.

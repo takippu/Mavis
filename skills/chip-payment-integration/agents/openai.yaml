@@ -1,0 +1,4 @@
+interface:
+  display_name: "CHIP Payment Integration"
+  short_description: "Build and harden CHIP Collect payment flows"
+  default_prompt: "Use $chip-payment-integration to integrate CHIP Collect securely into this application."

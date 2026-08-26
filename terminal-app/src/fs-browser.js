@@ -13,11 +13,13 @@ const path = require('path');
 
 // heavy/noise dirs skipped by listDir unless the caller overrides opts.ignore. Dotfiles
 // are otherwise shown; this denylist is names-only (matched against each entry basename).
-const IGNORE = new Set(['.git', 'node_modules', 'dist', '.next', 'build', '.superpowers']);
+const IGNORE = new Set(['.git', 'node_modules', 'dist', '.next', 'build', 'coverage', '.superpowers']);
 
 const DEFAULT_LIST_LIMIT = 2000;          // listDir entry cap → truncated=true past this
 const MAX_READ_BYTES = 2 * 1024 * 1024;   // ~2 MB read cap → { tooLarge:true }
 const SNIFF_BYTES = 8 * 1024;             // NUL-byte binary sniff window (first 8 KB)
+const DEFAULT_SEARCH_LIMIT = 200;         // result cap; caller gets truncated=true past this
+const MAX_SEARCH_FILES = 10000;           // traversal ceiling so a broad root stays bounded
 
 // ---------- path confinement ----------
 
@@ -61,6 +63,25 @@ function safeResolve(root, rel) {
   const realTarget = realDeepestAncestor(target);
   if (!withinRoot(realBase, realTarget)) throw new Error('EPATH: path escapes root via symlink: ' + r);
   return target;
+}
+
+// Resolve a user-submitted browser root. Unlike safeResolve(), this accepts an absolute
+// path, but only when the directory already exists and its real path remains beneath the
+// configured Projects ceiling. Returning the real path also prevents an approved symlink
+// from being retargeted after approval.
+function resolveBrowsableRoot(ceiling, requested) {
+  const raw = String(requested == null ? '' : requested).trim();
+  const unquoted = ((raw.startsWith('"') && raw.endsWith('"')) || (raw.startsWith("'") && raw.endsWith("'")))
+    ? raw.slice(1, -1).trim()
+    : raw;
+  if (!unquoted) throw new Error('EPATH: enter a directory path');
+  const realCeiling = fs.realpathSync(path.resolve(String(ceiling == null ? '' : ceiling)));
+  const candidate = path.resolve(unquoted);
+  const realCandidate = fs.realpathSync(candidate);
+  if (!withinRoot(realCeiling, realCandidate)) throw new Error('EPATH: directory is outside the configured Projects folder');
+  const st = fs.statSync(realCandidate);
+  if (!st.isDirectory()) throw new Error('ENOTDIR: path is not a directory');
+  return realCandidate;
 }
 
 // ---------- list ----------
@@ -107,6 +128,86 @@ async function readFile(root, rel) {
   return { text: buf.toString('utf8'), binary: false, tooLarge: false, size };
 }
 
+// ---------- search ----------
+
+// searchFiles(root, query, { mode:'files'|'content', limit }) searches the whole confined
+// root, not only folders already expanded in the renderer. File mode matches relative paths;
+// content mode returns one result per matching line. The same heavy-directory denylist and
+// 2 MB/binary guards as list/read apply. No external `rg` dependency: packaged builds behave
+// identically on machines that do not have developer tools installed.
+async function searchFiles(root, query, opts = {}) {
+  const needle = String(query == null ? '' : query).trim().toLocaleLowerCase();
+  const mode = opts.mode === 'content' ? 'content' : 'files';
+  const limit = Math.max(1, Math.min(Number(opts.limit) || DEFAULT_SEARCH_LIMIT, DEFAULT_SEARCH_LIMIT));
+  if (!needle) return { results: [], truncated: false, scanned: 0 };
+
+  const base = safeResolve(root, '.');
+  const stack = [{ abs: base, rel: '.' }];
+  const results = [];
+  let scanned = 0;
+  let truncated = false;
+
+  while (stack.length && scanned < MAX_SEARCH_FILES) {
+    const current = stack.pop();
+    let dirents;
+    try { dirents = await fsp.readdir(current.abs, { withFileTypes: true }); }
+    catch { continue; }
+    // Reverse alpha because this is a LIFO stack; results still walk alpha top-down.
+    dirents.sort((a, b) => b.name.localeCompare(a.name, undefined, { sensitivity: 'accent' }));
+    for (const d of dirents) {
+      if (IGNORE.has(d.name)) continue;
+      // Never descend through a symlink/junction. safeResolve rejects links that leave the root,
+      // but an in-root link back to an ancestor is still a recursive cycle.
+      if (d.isSymbolicLink()) continue;
+      const rel = current.rel === '.' ? d.name : current.rel + '/' + d.name;
+      let abs;
+      try { abs = safeResolve(root, rel); }
+      catch { continue; } // dangling/out-of-root symlink or a churning path
+      let st;
+      try { st = await fsp.stat(abs); }
+      catch { continue; }
+      if (st.isDirectory()) { stack.push({ abs, rel }); continue; }
+      if (!st.isFile()) continue;
+      scanned++;
+
+      if (mode === 'files') {
+        if (rel.toLocaleLowerCase().includes(needle)) {
+          const baseLower = d.name.toLocaleLowerCase();
+          const score = baseLower === needle ? 0 : baseLower.startsWith(needle) ? 1 : baseLower.includes(needle) ? 2 : 3;
+          results.push({ rel, name: d.name, score });
+        }
+        continue;
+      }
+
+      if (st.size > MAX_READ_BYTES) continue;
+      let buf;
+      try { buf = await fsp.readFile(abs); }
+      catch { continue; }
+      const sniff = buf.length > SNIFF_BYTES ? buf.subarray(0, SNIFF_BYTES) : buf;
+      if (sniff.includes(0)) continue;
+      const lines = buf.toString('utf8').split(/\r?\n/);
+      for (let i = 0; i < lines.length; i++) {
+        const at = lines[i].toLocaleLowerCase().indexOf(needle);
+        if (at < 0) continue;
+        const start = Math.max(0, at - 120);
+        const end = Math.min(lines[i].length, start + 360);
+        const preview = (start ? '…' : '') + lines[i].slice(start, end) + (end < lines[i].length ? '…' : '');
+        results.push({ rel, name: d.name, line: i + 1, column: at + 1, text: preview });
+        if (results.length > limit) { truncated = true; break; }
+      }
+      if (truncated) break;
+    }
+    if (truncated) break;
+  }
+  if (stack.length || scanned >= MAX_SEARCH_FILES) truncated = true;
+  if (mode === 'files') {
+    results.sort((a, b) => a.score - b.score || a.rel.localeCompare(b.rel, undefined, { sensitivity: 'accent' }));
+    if (results.length > limit) truncated = true;
+    return { results: results.slice(0, limit).map(({ score, ...r }) => r), truncated, scanned };
+  }
+  return { results: results.slice(0, limit), truncated, scanned };
+}
+
 // ---------- write ----------
 
 // writeFile(root, rel, text) → { ok, size } | throws. Atomic (write `<target>.tmp` then
@@ -148,11 +249,15 @@ async function writeFile(root, rel, text) {
 
 module.exports = {
   safeResolve,
+  resolveBrowsableRoot,
   listDir,
   readFile,
+  searchFiles,
   writeFile,
   IGNORE,
   MAX_READ_BYTES,
   SNIFF_BYTES,
   DEFAULT_LIST_LIMIT,
+  DEFAULT_SEARCH_LIMIT,
+  MAX_SEARCH_FILES,
 };

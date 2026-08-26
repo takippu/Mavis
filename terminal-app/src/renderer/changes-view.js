@@ -14,7 +14,7 @@
   const icon = (name, size) => (MT.icons ? MT.icons.svg(name, size) : '');
 
   // module-level so a nav-away doesn't lose a typed commit message
-  const state = { message: '', railCollapsed: false };
+  const state = { message: '', railCollapsed: false, searchMode: 'files', searchQuery: '' };
 
   MT.changes = {
     render(host, ctx) {
@@ -31,6 +31,8 @@
       let repo = null;          // { root, branch, detached, ahead, upstream }
       let sel = null;           // { rel, staged }
       let entries = { staged: [], unstaged: [] };
+      let pendingHit = null;    // { rel, staged, side, line } from a diff-content result
+      let searchResults = [], searchLoading = false, searchTimer = null, searchSeq = 0;
       // The TRUSTED SEED. git:resolve validates its argument as a session *cwd* against
       // the files:* allowlist — a repo root is usually an ANCESTOR of that cwd and is not
       // itself allowlisted, so re-resolving must always replay this cwd, never repo.root.
@@ -50,10 +52,20 @@
       const branchIco = el('span', 'mt-chg-branch-ico'); branchIco.innerHTML = icon('git-branch', 14);
       const branchName = el('span', 'mt-chg-branch-name', '...');
       branchChip.append(branchIco, branchName);
+      const search = el('div', 'mt-chg-search');
+      const searchModeEl = el('div', 'mt-chg-search-mode');
+      const fileModeBtn = el('button', 'mt-chg-search-mode-btn', 'Files'); fileModeBtn.type = 'button';
+      const contentModeBtn = el('button', 'mt-chg-search-mode-btn', 'Content'); contentModeBtn.type = 'button';
+      const searchField = el('label', 'mt-chg-search-field');
+      const searchIco = el('span', 'mt-chg-search-ico'); searchIco.innerHTML = icon('search', 14);
+      const searchInput = el('input'); searchInput.type = 'search'; searchInput.value = state.searchQuery;
+      searchModeEl.append(fileModeBtn, contentModeBtn);
+      searchField.append(searchIco, searchInput);
+      search.append(searchModeEl, searchField);
       const spacer = el('span', 'mt-chg-spacer');
       const refreshBtn = el('button', 'mt-chg-btn', 'Refresh'); refreshBtn.type = 'button';
       const pushBtn = el('button', 'mt-chg-btn', 'Push'); pushBtn.type = 'button';
-      head.append(repoChip, branchChip, spacer, refreshBtn, pushBtn);
+      head.append(repoChip, branchChip, search, spacer, refreshBtn, pushBtn);
       wrap.appendChild(head);
 
       const body = el('div', 'mt-chg-body');
@@ -64,6 +76,56 @@
       host.appendChild(wrap);
 
       if (state.railCollapsed) wrap.classList.add('mt-chg-rail-collapsed');
+
+      function setSearchMode(mode) {
+        state.searchMode = mode === 'content' ? 'content' : 'files';
+        fileModeBtn.classList.toggle('active', state.searchMode === 'files');
+        contentModeBtn.classList.toggle('active', state.searchMode === 'content');
+        fileModeBtn.setAttribute('aria-pressed', state.searchMode === 'files' ? 'true' : 'false');
+        contentModeBtn.setAttribute('aria-pressed', state.searchMode === 'content' ? 'true' : 'false');
+        searchInput.placeholder = state.searchMode === 'content' ? 'Search changed text…' : 'Search changed files…';
+        searchInput.setAttribute('aria-label', state.searchMode === 'content' ? 'Search added and removed text' : 'Search changed file names');
+        if (state.searchQuery.trim()) scheduleSearch(true);
+      }
+      fileModeBtn.addEventListener('click', () => setSearchMode('files'));
+      contentModeBtn.addEventListener('click', () => setSearchMode('content'));
+      setSearchMode(state.searchMode);
+      searchInput.addEventListener('input', () => {
+        state.searchQuery = searchInput.value;
+        scheduleSearch(false);
+      });
+      searchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && searchInput.value) {
+          e.preventDefault(); searchInput.value = ''; state.searchQuery = ''; scheduleSearch(true);
+        }
+      });
+
+      function scheduleSearch(immediate) {
+        clearTimeout(searchTimer);
+        const query = state.searchQuery.trim();
+        if (!query || query.length < 2) {
+          searchSeq++; searchResults = []; searchLoading = false; pendingHit = null; paintRail();
+          return;
+        }
+        searchTimer = setTimeout(() => runSearch(query), immediate ? 0 : 220);
+      }
+
+      async function runSearch(query) {
+        if (!repo) return;
+        const seq = ++searchSeq;
+        const forRoot = repo.root;
+        searchLoading = true;
+        paintRail();
+        let res;
+        try { res = await window.mavis.gitSearch(forRoot, query, state.searchMode); }
+        catch { res = { error: 'Search failed' }; }
+        if (!alive() || seq !== searchSeq || !repo || repo.root !== forRoot) return;
+        searchLoading = false;
+        if (!res || res.error) { searchResults = []; fail((res && res.error) || 'Could not search changes'); }
+        else searchResults = Array.isArray(res.results) ? res.results : [];
+        searchResults.truncated = !!(res && res.truncated);
+        paintRail();
+      }
 
       // ---- rail ----
       function paintRail() {
@@ -79,10 +141,52 @@
         rail.appendChild(toggle);
 
         const total = entries.staged.length + entries.unstaged.length;
+        const query = state.searchQuery.trim();
+        if (query) {
+          if (query.length < 2) {
+            rail.appendChild(el('div', 'mt-chg-search-note', 'Type at least 2 characters.'));
+          } else if (searchLoading) {
+            rail.appendChild(el('div', 'mt-chg-search-note', state.searchMode === 'content' ? 'Searching changed text…' : 'Searching changed files…'));
+          } else {
+            const summary = searchResults.length + ' result' + (searchResults.length === 1 ? '' : 's') + (searchResults.truncated ? ' · first 200 shown' : '');
+            rail.appendChild(el('div', 'mt-chg-search-summary', summary));
+            if (!searchResults.length) rail.appendChild(el('div', 'mt-chg-search-note', 'No matches for “' + query + '”.'));
+            else searchResults.forEach((r) => rail.appendChild(searchRow(r)));
+          }
+          commitBox();
+          return;
+        }
         if (!total) { rail.appendChild(el('div', 'mt-chg-empty', 'No changes.')); return; }
         section('Staged', entries.staged, true);
         section('Changes', entries.unstaged, false);
         commitBox();
+      }
+
+      function searchRow(r) {
+        const row = el('div', 'mt-chg-search-result');
+        row.setAttribute('role', 'button'); row.tabIndex = 0;
+        if (sel && sel.rel === r.rel && sel.staged === !!r.staged) row.classList.add('selected');
+        const st = el('span', 'mt-chg-st s-' + (r.status || 'M'), r.status || 'M');
+        const copy = el('span', 'mt-chg-search-copy');
+        const title = el('span', 'mt-chg-search-title', r.name || baseName(r.rel));
+        const place = state.searchMode === 'content'
+          ? r.rel + ' · ' + (r.staged ? 'staged' : 'unstaged') + ' · ' + r.side + ':' + r.line
+          : r.rel + ' · ' + (r.staged ? 'staged' : 'unstaged');
+        copy.append(title, el('span', 'mt-chg-search-path', place));
+        if (state.searchMode === 'content') copy.appendChild(el('span', 'mt-chg-search-snip ' + (r.type || ''), String(r.text || '').trim() || '(blank line)'));
+        row.append(st, copy);
+        row.title = r.rel;
+        const open = () => {
+          sel = { rel: r.rel, staged: !!r.staged };
+          pendingHit = state.searchMode === 'content'
+            ? { rel: r.rel, staged: !!r.staged, side: r.side, line: Number(r.line) || null }
+            : null;
+          paintRail();
+          loadDiff();
+        };
+        row.addEventListener('click', open);
+        row.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); open(); } });
+        return row;
       }
 
       function section(label, list, staged) {
@@ -143,7 +247,7 @@
         row.append(ck, st, nm, dr);
         row.title = e.rel;
 
-        const open = () => { sel = { rel: e.rel, staged }; paintRail(); loadDiff(); };
+        const open = () => { sel = { rel: e.rel, staged }; pendingHit = null; paintRail(); loadDiff(); };
         row.addEventListener('click', open);
         row.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); open(); } });
         return row;
@@ -209,7 +313,8 @@
           }
         }
         if (!sel) { const first = entries.unstaged[0] || entries.staged[0]; if (first) sel = { rel: first.rel, staged: !entries.unstaged.length }; }
-        paintRail();
+        if (state.searchQuery.trim().length >= 2) await runSearch(state.searchQuery.trim());
+        else paintRail();
         await loadDiff();
         await refreshRepoChip();
       }
@@ -245,6 +350,7 @@
         if (!info || info.error) {
           repo = null;
           entries = { staged: [], unstaged: [] };
+          searchResults = []; searchLoading = false; searchSeq++;
           pushBadge();   // clear the badge — a stale count from the previous repo would be a lie
           repoName.textContent = 'No repository';
           branchName.textContent = '-';
@@ -342,6 +448,7 @@
         // highlighting path renders flat monochrome. This class reuses files.css's palette,
         // including its nine-theme dark overrides.
         const grid = el('div', 'mt-chg-grid cm-s-mavis');
+        let hitEl = null;
         // headers
         grid.appendChild(el('div', 'mt-chg-col-h', 'Old'));
         grid.appendChild(el('div', 'mt-chg-col-h', 'New'));
@@ -350,12 +457,17 @@
           hh.style.gridColumn = '1 / -1';
           grid.appendChild(hh);
           h.rows.forEach((r) => {
-            grid.appendChild(cell(r, 'old', mode));
-            grid.appendChild(cell(r, 'new', mode));
+            const oldCell = cell(r, 'old', mode, mySel);
+            const newCell = cell(r, 'new', mode, mySel);
+            if (oldCell.classList.contains('search-hit')) hitEl = oldCell;
+            if (newCell.classList.contains('search-hit')) hitEl = newCell;
+            grid.appendChild(oldCell);
+            grid.appendChild(newCell);
           });
         });
         scroll.appendChild(grid);
         diffEl.appendChild(scroll);
+        if (hitEl) requestAnimationFrame(() => hitEl.scrollIntoView({ block: 'center', inline: 'nearest' }));
 
         if (res.truncated) {
           // No silent caps — say what was dropped.
@@ -363,7 +475,7 @@
         }
       }
 
-      function cell(r, side, mode) {
+      function cell(r, side, mode, currentSel) {
         const isOld = side === 'old';
         const text = isOld ? r.oldText : r.newText;
         const num = isOld ? r.oldNum : r.newNum;
@@ -375,6 +487,8 @@
         else if (r.type === 'ctx') cls += '';       // unchanged, no tint
         else if (isOld) cls += ' del';              // a non-null old cell in a change row is a removal
         else cls += ' add';                         // a non-null new cell in a change row is an addition
+        if (pendingHit && pendingHit.rel === currentSel.rel && pendingHit.staged === currentSel.staged &&
+            pendingHit.side === side && pendingHit.line === num) cls += ' search-hit';
         const c = el('div', cls);
         c.appendChild(el('span', 'mt-chg-n', num == null ? '' : String(num)));
         const code = el('span', 'mt-chg-c');
@@ -493,16 +607,19 @@
       })();
 
       // ---- re-root on session change (same poll as files-view; no event is exposed) ----
-      let everConnected = false;
       let lastCwd = (MT.session && MT.session.activeCwd && MT.session.activeCwd()) || null;
       const poll = setInterval(() => {
         if (!alive()) { clearInterval(poll); return; }
-        if (host.isConnected) everConnected = true;
-        else if (everConnected) { clearInterval(poll); return; }
-        else return;
+        if (!host.isConnected) return;
         const cwd = (MT.session && MT.session.activeCwd && MT.session.activeCwd()) || null;
         if (cwd && cwd !== lastCwd) { lastCwd = cwd; loadRoot(cwd); }
       }, 1500);
+
+      MT.changes.onShow = () => {
+        if (!alive()) return;
+        const cwd = (MT.session && MT.session.activeCwd && MT.session.activeCwd()) || null;
+        if (cwd && cwd !== lastCwd) { lastCwd = cwd; loadRoot(cwd); }
+      };
 
       return Promise.resolve();
     },

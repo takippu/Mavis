@@ -1,0 +1,5 @@
+interface:
+  display_name: "SEO Competitor Analysis"
+  short_description: "Find and analyze organic search competitors"
+  default_prompt: "Use $seo-competitor-analysis to discover my real search competitors and explain the highest-impact visibility gaps."
+

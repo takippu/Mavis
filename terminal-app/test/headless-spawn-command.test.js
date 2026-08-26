@@ -51,7 +51,7 @@ test('claude headless command line on --resume carries no permission flag either
   assert.ok(!args.includes('--permission-mode'));
 });
 
-test('codex headless command line: sandbox/approval flags UNCHANGED (Finding 1 says do not touch this mapping)', () => {
+test('codex headless command line uses the supported non-interactive plan policy', () => {
   const h = codex.headlessArgs({ prompt: 'hi' });
   const cmd = codex.headlessCommand({ binPath: 'C:/npm/codex.cmd', permissionMode: 'plan' });
   const args = cmd.args.concat(h.args);
@@ -59,17 +59,17 @@ test('codex headless command line: sandbox/approval flags UNCHANGED (Finding 1 s
   assert.match(cmd.file, /cmd\.exe$/i);
   assert.deepStrictEqual(args, [
     '/c', 'C:/npm/codex.cmd',
-    '--sandbox', 'read-only', '--ask-for-approval', 'untrusted',
+    '--sandbox', 'read-only', '--ask-for-approval', 'never',
     'exec', '--json', 'hi',
   ]);
 });
 
-test('codex headless resume carries the server-assigned thread id, sandbox flags still unchanged', () => {
+test('codex headless resume carries the server-assigned thread id and supported plan policy', () => {
   const h = codex.headlessArgs({ prompt: 'again', sessionId: 'thr_9', resume: true });
   const cmd = codex.headlessCommand({ binPath: 'C:/tools/codex.exe', permissionMode: 'plan' });
   const args = cmd.args.concat(h.args);
   assert.deepStrictEqual(args, [
-    '--sandbox', 'read-only', '--ask-for-approval', 'untrusted',
+    '--sandbox', 'read-only', '--ask-for-approval', 'never',
     'exec', 'resume', 'thr_9', '--json', 'again',
   ]);
 });
@@ -81,7 +81,7 @@ test('codex isolated DailyOps line uses non-git + stdin flags; Claude stays unto
   const cmd = codex.headlessCommand({ binPath: 'C:/npm/codex.cmd', permissionMode: 'plan' });
   assert.deepStrictEqual(cmd.args.concat(h.args), [
     '/c', 'C:/npm/codex.cmd',
-    '--sandbox', 'read-only', '--ask-for-approval', 'untrusted',
+    '--sandbox', 'read-only', '--ask-for-approval', 'never',
     'exec', '--json', '--skip-git-repo-check', '-',
   ]);
   assert.strictEqual(h.stdin, 'dailyops');

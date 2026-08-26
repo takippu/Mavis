@@ -76,8 +76,10 @@ process.stdin.on('end', function () {
     const dir = process.argv[3] || process.env.MAVIS_EVENTS_DIR;
     if (!dir) return;
     fs.mkdirSync(dir, { recursive: true });
+    const sessionId = j.session_id || j.sessionId || j.thread_id || j.threadId || j.conversation_id || null;
+    const transcriptPath = j.transcript_path || j.transcriptPath || null;
     fs.appendFileSync(path.join(dir, token + '.jsonl'),
-      JSON.stringify({ state: state, at: Date.now() }) + '\\n');
+      JSON.stringify({ state: state, at: Date.now(), sessionId: sessionId, transcriptPath: transcriptPath }) + '\\n');
   } catch (e) { /* never block the session */ }
 });
 `;
@@ -238,7 +240,15 @@ function createReader({ userDataDir, onState, pollMs = 4000, debounceMs = 60 } =
       let j = null;
       try { j = JSON.parse(s); } catch { continue; }
       if (!j || !j.state) continue;
-      try { onState({ token, state: String(j.state), at: j.at || null }); } catch { /* ignore */ }
+      try {
+        onState({
+          token,
+          state: String(j.state),
+          at: j.at || null,
+          sessionId: typeof j.sessionId === 'string' ? j.sessionId : null,
+          transcriptPath: typeof j.transcriptPath === 'string' ? j.transcriptPath : null,
+        });
+      } catch { /* ignore */ }
     }
   };
 

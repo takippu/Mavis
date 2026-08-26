@@ -50,20 +50,39 @@
       host.innerHTML = '';
 
       // view state (closure-scoped to this render)
-      let root = null, rootName = '';
+      let root = null;
       let cm = null;                 // live CodeMirror instance, or null (placeholder / no file)
       let openRel = null, openName = '';
       let openRowEl = null;          // the selected tree row (for the selection + dirty marker)
       let dirty = false, lastSaved = '';
+      let rootList = null, parentAbs = null;
+      let searchMode = 'files', searchTimer = null, searchSeq = 0;
+      let editorMarks = [];
 
       // ---- shell: header + body (tree | editor) ----
       const wrap = el('div', 'mt-files');
       const head = el('div', 'mt-files-head');
-      const rootChip = el('div', 'mt-files-root');
+      const rootChip = el('form', 'mt-files-root');
+      rootChip.setAttribute('aria-label', 'Open directory');
       const rootIco = el('span', 'mt-files-root-ico'); rootIco.innerHTML = icon('folder', 16);
-      const rootLabel = el('span', 'mt-files-root-name', '…');
-      rootChip.appendChild(rootIco); rootChip.appendChild(rootLabel);
-      head.appendChild(rootChip);
+      const rootInput = el('input', 'mt-files-root-path'); rootInput.type = 'text'; rootInput.placeholder = 'Directory path';
+      rootInput.setAttribute('aria-label', 'Directory path'); rootInput.spellcheck = false;
+      const copyRootBtn = el('button', 'mt-files-root-copy'); copyRootBtn.type = 'button';
+      copyRootBtn.innerHTML = icon('copy', 14); copyRootBtn.title = 'Copy directory path'; copyRootBtn.setAttribute('aria-label', 'Copy directory path');
+      const openRootBtn = el('button', 'mt-files-root-open', 'Open'); openRootBtn.type = 'submit';
+      rootChip.append(rootIco, rootInput, copyRootBtn, openRootBtn);
+      const search = el('div', 'mt-files-search');
+      const searchModeEl = el('div', 'mt-files-search-mode');
+      const fileModeBtn = el('button', 'mt-files-search-mode-btn active', 'Files'); fileModeBtn.type = 'button';
+      const contentModeBtn = el('button', 'mt-files-search-mode-btn', 'Content'); contentModeBtn.type = 'button';
+      const searchField = el('label', 'mt-files-search-field');
+      const searchIco = el('span', 'mt-files-search-ico'); searchIco.innerHTML = icon('search', 15);
+      const searchInput = el('input'); searchInput.type = 'search'; searchInput.placeholder = 'Search file names…';
+      searchInput.setAttribute('aria-label', 'Search project file names');
+      searchModeEl.append(fileModeBtn, contentModeBtn);
+      searchField.append(searchIco, searchInput);
+      search.append(searchModeEl, searchField);
+      head.append(rootChip, search);
       wrap.appendChild(head);
 
       const body = el('div', 'mt-files-body');
@@ -93,6 +112,172 @@
         if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) { e.preventDefault(); doSave(); }
       });
 
+      rootChip.addEventListener('submit', (e) => { e.preventDefault(); openSubmittedRoot(); });
+      copyRootBtn.addEventListener('click', async () => {
+        if (!root) return;
+        try {
+          await navigator.clipboard.writeText(root);
+          if (MT.toast) MT.toast.show({ title: 'Path copied', body: root, timeout: 2200 });
+        } catch {
+          if (MT.toast) MT.toast.show({ title: 'Copy failed', body: 'Select the path and copy it manually.', timeout: 4200 });
+          rootInput.focus(); rootInput.select();
+        }
+      });
+
+      async function openSubmittedRoot() {
+        const requested = rootInput.value.trim();
+        if (!requested) { rootInput.focus(); return; }
+        if (dirty) {
+          const choice = await promptUnsaved(openName);
+          if (choice === 'cancel') { rootInput.value = root || requested; return; }
+          if (choice === 'save') { await doSave(); if (dirty) return; }
+        }
+        openRootBtn.disabled = true;
+        let res;
+        try { res = await window.mavis.filesOpenRoot(requested); }
+        catch { res = { error: 'Directory could not be opened.' }; }
+        openRootBtn.disabled = false;
+        if (token !== MT.files._seq) return;
+        if (!res || res.error || !res.root) {
+          rootInput.value = root || requested;
+          if (MT.toast) MT.toast.show({ title: 'Directory not opened', body: (res && res.error) || 'Choose an existing folder inside Projects.', timeout: 5200 });
+          rootInput.focus(); rootInput.select();
+          return;
+        }
+        await loadRoot(res.root);
+        rootInput.blur();
+      }
+
+      function setSearchMode(mode) {
+        searchMode = mode === 'content' ? 'content' : 'files';
+        fileModeBtn.classList.toggle('active', searchMode === 'files');
+        contentModeBtn.classList.toggle('active', searchMode === 'content');
+        fileModeBtn.setAttribute('aria-pressed', searchMode === 'files' ? 'true' : 'false');
+        contentModeBtn.setAttribute('aria-pressed', searchMode === 'content' ? 'true' : 'false');
+        searchInput.placeholder = searchMode === 'content' ? 'Search file contents…' : 'Search file names…';
+        searchInput.setAttribute('aria-label', searchMode === 'content' ? 'Search project file contents' : 'Search project file names');
+        if (searchMode !== 'content') clearEditorSearch();
+        if (searchInput.value.trim()) scheduleSearch(true);
+      }
+      fileModeBtn.addEventListener('click', () => setSearchMode('files'));
+      contentModeBtn.addEventListener('click', () => setSearchMode('content'));
+      setSearchMode('files');
+
+      searchInput.addEventListener('input', () => scheduleSearch(false));
+      searchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && searchInput.value) {
+          e.preventDefault(); searchInput.value = ''; scheduleSearch(true);
+        }
+      });
+
+      function scheduleSearch(immediate) {
+        clearTimeout(searchTimer);
+        const query = searchInput.value.trim();
+        if (!query) { searchSeq++; clearEditorSearch(); paintNormalTree(); return; }
+        if (query.length < 2) {
+          searchSeq++; clearEditorSearch();
+          treeEl.innerHTML = '';
+          treeEl.appendChild(el('div', 'mt-files-search-note', 'Type at least 2 characters.'));
+          return;
+        }
+        searchTimer = setTimeout(() => runSearch(query), immediate ? 0 : 220);
+      }
+
+      async function runSearch(query) {
+        if (!root) return;
+        const seq = ++searchSeq;
+        const forRoot = root;
+        const local = searchMode === 'content' ? searchOpenEditor(query) : { results: [], truncated: false };
+        paintSearch(query, local, [], true, false);
+        let res;
+        try { res = await window.mavis.filesSearch(forRoot, query, searchMode); }
+        catch { res = { error: 'Search failed' }; }
+        if (token !== MT.files._seq || seq !== searchSeq || root !== forRoot) return;
+        if (!res || res.error) {
+          paintSearch(query, local, [], false, false);
+          treeEl.appendChild(el('div', 'mt-files-search-note error', 'Project search failed. The open-file results are still available.'));
+          return;
+        }
+        const results = (Array.isArray(res.results) ? res.results : [])
+          .filter((r) => !(searchMode === 'content' && cm && r.rel === openRel));
+        paintSearch(query, local, results, false, !!res.truncated);
+      }
+
+      function clearEditorSearch() {
+        editorMarks.forEach((mark) => { try { mark.clear(); } catch { /* stale mark */ } });
+        editorMarks = [];
+      }
+
+      function searchOpenEditor(query) {
+        clearEditorSearch();
+        if (!cm || !openRel) return { results: [], truncated: false };
+        const needle = query.toLocaleLowerCase();
+        const lines = cm.getValue().split('\n');
+        const results = [];
+        let truncated = false;
+        for (let line = 0; line < lines.length; line++) {
+          const lower = lines[line].toLocaleLowerCase();
+          let from = 0;
+          for (;;) {
+            const at = lower.indexOf(needle, from);
+            if (at < 0) break;
+            if (results.length >= 200) { truncated = true; break; }
+            const snipStart = Math.max(0, at - 120);
+            const snipEnd = Math.min(lines[line].length, snipStart + 360);
+            const snippet = (snipStart ? '…' : '') + lines[line].slice(snipStart, snipEnd) + (snipEnd < lines[line].length ? '…' : '');
+            results.push({ rel: openRel, name: openName, line: line + 1, column: at + 1, text: snippet, openBuffer: true });
+            from = at + Math.max(1, needle.length);
+          }
+          if (truncated) break;
+        }
+        results.forEach((r, i) => {
+          const from = { line: r.line - 1, ch: r.column - 1 };
+          const to = { line: r.line - 1, ch: r.column - 1 + query.length };
+          const mark = cm.markText(from, to, { className: 'mt-files-find-hit' + (i === 0 ? ' current' : '') });
+          editorMarks.push(mark);
+        });
+        if (results[0]) revealLine(results[0].line, results[0].column, false);
+        return { results, truncated };
+      }
+
+      function paintSearch(query, local, project, loading, projectTruncated) {
+        treeEl.innerHTML = '';
+        const localResults = local && Array.isArray(local.results) ? local.results : [];
+        if (localResults.length) {
+          treeEl.appendChild(el('div', 'mt-files-search-summary', 'Open file · ' + localResults.length + ' match' + (localResults.length === 1 ? '' : 'es') + (local.truncated ? ' · first 200 shown' : '')));
+          localResults.forEach((r) => treeEl.appendChild(searchResult(r)));
+        }
+        if (loading) {
+          const loadingText = searchMode === 'content'
+            ? (localResults.length ? 'Searching the rest of the project…' : 'Searching project contents…')
+            : 'Searching project files…';
+          treeEl.appendChild(el('div', 'mt-files-search-note', loadingText));
+          return;
+        }
+        if (project.length) {
+          treeEl.appendChild(el('div', 'mt-files-search-summary', 'Project · ' + project.length + ' result' + (project.length === 1 ? '' : 's') + (projectTruncated ? ' · first 200 shown' : '')));
+          project.forEach((r) => treeEl.appendChild(searchResult(r)));
+        }
+        if (!localResults.length && !project.length) treeEl.appendChild(el('div', 'mt-files-search-note', 'No matches for “' + query + '”.'));
+      }
+
+      function searchResult(r) {
+        const row = el('div', 'mt-files-search-result');
+        row.setAttribute('role', 'button'); row.tabIndex = 0;
+        const ico = el('span', 'mt-files-search-result-ico'); ico.innerHTML = FILE_SVG;
+        const copy = el('span', 'mt-files-search-result-copy');
+        const title = el('span', 'mt-files-search-result-title', r.name || baseName(r.rel));
+        const pathText = searchMode === 'content' && r.line ? r.rel + ':' + r.line : r.rel;
+        copy.append(title, el('span', 'mt-files-search-result-path', pathText));
+        if (searchMode === 'content' && r.text != null) copy.appendChild(el('span', 'mt-files-search-result-snip', String(r.text).trim() || '(blank line)'));
+        row.append(ico, copy);
+        row.title = r.rel;
+        const open = () => openFile(r.rel, row, r.name || baseName(r.rel), r.line, r.column);
+        row.addEventListener('click', open);
+        row.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
+        return row;
+      }
+
       // ---- dirty flag → filename star + tree-row marker + save button ----
       function setDirty(d) {
         dirty = !!d;
@@ -102,9 +287,16 @@
       }
 
       // ---- editor mount / teardown ----
-      function teardownCM() { cm = null; edBody.innerHTML = ''; }
+      function teardownCM() { clearEditorSearch(); cm = null; edBody.innerHTML = ''; }
       function showPlaceholder(msg) { teardownCM(); const p = el('div', 'mt-files-ed-empty', msg); edBody.appendChild(p); }
-      function mountEditor(text, name) {
+      function revealLine(line, column, focus = true) {
+        if (!cm || !line) return;
+        const pos = { line: Math.max(0, Number(line) - 1), ch: Math.max(0, Number(column || 1) - 1) };
+        cm.setCursor(pos);
+        cm.scrollIntoView(pos, 90);
+        if (focus) cm.focus();
+      }
+      function mountEditor(text, name, line, column) {
         edBody.innerHTML = '';
         const cmHost = el('div', 'mt-files-cm');
         edBody.appendChild(cmHost);
@@ -119,9 +311,16 @@
         });
         lastSaved = cm.getValue();
         setDirty(false);
-        cm.on('change', () => setDirty(cm.getValue() !== lastSaved));
+        cm.on('change', () => {
+          setDirty(cm.getValue() !== lastSaved);
+          if (searchMode === 'content' && searchInput.value.trim().length >= 2) scheduleSearch(false);
+        });
         // let the flex layout settle, then refresh so CM measures its real height
-        requestAnimationFrame(() => { if (cm) cm.refresh(); });
+        requestAnimationFrame(() => {
+          if (!cm) return;
+          cm.refresh(); revealLine(line, column);
+          if (searchMode === 'content' && searchInput.value.trim().length >= 2) scheduleSearch(true);
+        });
       }
 
       async function doSave() {
@@ -139,8 +338,8 @@
       }
 
       // ---- open a file (guarding unsaved edits on switch) ----
-      async function openFile(rel, rowEl, name) {
-        if (rel === openRel) return;
+      async function openFile(rel, rowEl, name, line, column) {
+        if (rel === openRel) { selectRow(rowEl); revealLine(line, column); return; }
         if (dirty) {
           const choice = await promptUnsaved(openName);
           if (choice === 'cancel') return;
@@ -162,7 +361,7 @@
         if (res && res.error) { showPlaceholder('Could not read this file.'); return; }
         if (res && res.binary) showPlaceholder('Binary file — not shown.');
         else if (res && res.tooLarge) showPlaceholder('File too large to edit' + (res.size ? ' (' + fmtSize(res.size) + ')' : '') + '.');
-        else mountEditor(res ? res.text : '', name);
+        else mountEditor(res ? res.text : '', name, line, column);
       }
 
       function selectRow(rowEl) {
@@ -234,6 +433,11 @@
         row.appendChild(el('span', 'mt-ftree-caret')); // spacer, aligns with dir carets
         const ic = el('span', 'mt-ftree-ico'); ic.innerHTML = FILE_SVG;
         row.appendChild(ic); row.appendChild(el('span', 'mt-ftree-name', name));
+        if (rel === openRel) {
+          openRowEl = row;
+          row.classList.add('selected');
+          row.classList.toggle('dirty', dirty);
+        }
         const open = () => openFile(rel, row, name);
         row.addEventListener('click', open);
         row.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
@@ -245,7 +449,6 @@
       // whole view and MAIN re-approves the new root (files:parent), ceiling'd at PROJECTS_ROOT.
       // filesParent doubles as the probe: an { error } answer means we're at the ceiling, so the
       // row simply isn't drawn rather than being drawn and doing nothing.
-      let parentAbs = null;
       async function probeParent(forRoot) {
         try { const r = await window.mavis.filesParent(forRoot); return (r && !r.error && r.root) ? r.root : null; }
         catch { return null; }
@@ -274,25 +477,32 @@
         return row;
       }
 
+      function paintNormalTree() {
+        treeEl.innerHTML = '';
+        const rootKids = el('div', 'mt-ftree-children');
+        treeEl.appendChild(rootKids);
+        if (rootList) renderLevel(rootKids, '.', 0, rootList);
+        else rootKids.appendChild(indentedEmpty(0, 'Could not read this folder.'));
+        if (parentAbs) rootKids.insertBefore(upNode(), rootKids.firstChild);
+      }
+
       // ---- (re)root the whole view at an absolute dir ----
       async function loadRoot(abs) {
         root = abs;
-        rootName = baseName(abs) || abs;
-        rootLabel.textContent = rootName;
+        rootInput.value = abs;
         rootChip.title = abs;
+        searchInput.value = '';
+        clearTimeout(searchTimer); searchSeq++;
         // a re-root belongs to the new project — reset the editor + selection
         openRel = null; openName = ''; edName.textContent = 'No file open';
         selectRow(null); setDirty(false); showPlaceholder('Select a file to view.');
         treeEl.innerHTML = '';
-        const rootKids = el('div', 'mt-ftree-children');
-        treeEl.appendChild(rootKids);
-        rootKids.appendChild(indentedEmpty(0, 'Loading…'));
+        treeEl.appendChild(el('div', 'mt-files-search-note', 'Loading…'));
         let res = null;
         try { res = await window.mavis.filesList(root, '.'); } catch (err) { res = null; }
         if (token !== MT.files._seq) return;
         if (res && res.error) res = null; // { error } sentinel from main → the error-note branch
-        if (res) renderLevel(rootKids, '.', 0, res);
-        else { rootKids.innerHTML = ''; rootKids.appendChild(indentedEmpty(0, 'Could not read this folder.')); }
+        rootList = res;
         // `..` on top, but only when main says an ascent is actually ALLOWED (probed per root, so
         // the row disappears at the ceiling instead of sitting there doing nothing). renderLevel
         // clears the container, so this has to come after it.
@@ -302,11 +512,13 @@
         // must win, and this stale one must not overwrite parentAbs or paint into its tree).
         if (token !== MT.files._seq || root !== abs) return;
         parentAbs = up;
-        if (parentAbs) rootKids.insertBefore(upNode(), rootKids.firstChild);
+        paintNormalTree();
       }
 
       function showNoRoot() {
-        rootLabel.textContent = 'No project';
+        rootInput.value = '';
+        rootInput.placeholder = 'Open a session or enter a project path';
+        rootList = null; parentAbs = null;
         treeEl.innerHTML = '';
         treeEl.appendChild(el('div', 'mt-empty', 'Open a session to browse its files.'));
       }
@@ -325,7 +537,6 @@
       // re-root on a real change. Tear down once this render is superseded or its host is
       // detached (navigated away). A re-root while there are unsaved edits is deferred to
       // a later tick so it never silently discards the buffer.
-      let everConnected = false;
       // Follow the ACTIVE SESSION, and only when it actually moves. This used to re-root whenever
       // `cwd !== root`, which was fine when root could only ever BE a session cwd — but now that
       // `..` can re-root above it, that condition is permanently true after a climb and would yank
@@ -334,13 +545,19 @@
       let lastCwd = (MT.session && MT.session.activeCwd && MT.session.activeCwd()) || null;
       const poll = setInterval(() => {
         if (token !== MT.files._seq) { clearInterval(poll); return; }
-        if (host.isConnected) everConnected = true;
-        else if (everConnected) { clearInterval(poll); return; }
-        else return;
+        if (!host.isConnected) return;
         if (dirty || !root) return;
         const cwd = (MT.session && MT.session.activeCwd && MT.session.activeCwd()) || null;
         if (cwd && cwd !== lastCwd) { lastCwd = cwd; loadRoot(cwd); }
       }, 1500);
+
+      MT.files.onShow = () => {
+        if (token !== MT.files._seq) return;
+        requestAnimationFrame(() => { if (cm) cm.refresh(); });
+        if (dirty) return;
+        const cwd = (MT.session && MT.session.activeCwd && MT.session.activeCwd()) || null;
+        if (cwd && cwd !== lastCwd) { lastCwd = cwd; loadRoot(cwd); }
+      };
 
       return Promise.resolve();
     },

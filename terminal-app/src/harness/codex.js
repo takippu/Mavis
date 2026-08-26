@@ -2,20 +2,21 @@
 
 // OpenAI Codex adapter. Same interface as ./claude, Codex's vocabulary.
 //
-// Permission flags were re-verified against codex-cli 0.146.0 via the installed CLI parser and
-// current OpenAI Codex manual on 2026-08-04. The exec --json event names were observed live from a
-// probe run on 2026-07-25. Both are version-dependent facts, not guarantees — re-verify on upgrade.
+// Permission flags were re-verified against codex-cli 0.149.1 via the installed CLI parser on
+// 2026-08-26. The exec --json event names were observed live from a probe run on 2026-07-25. Both
+// are version-dependent facts, not guarantees — re-verify on upgrade.
 
 const { execSync } = require('child_process');
 const { pickBinLine } = require('./claude');
 
 // Claude gates on WHAT KIND of action it is; Codex combines a sandbox boundary with an approval
-// policy. There is no exact acceptEdits equivalent in Codex 0.146: the old on-failure value was
-// removed, so acceptEdits falls back to the safest remaining interactive policy, on-request.
+// policy. There is no exact acceptEdits equivalent in Codex 0.149.1, so acceptEdits falls back to
+// the safest remaining interactive policy, on-request. Plan stays read-only and uses never because
+// that preset must not escalate writes and its headless callers have no TTY for approval prompts.
 const PERM_MAP = {
   default: ['--sandbox', 'workspace-write', '--ask-for-approval', 'on-request'],
   acceptEdits: ['--sandbox', 'workspace-write', '--ask-for-approval', 'on-request'],
-  plan: ['--sandbox', 'read-only', '--ask-for-approval', 'untrusted'],
+  plan: ['--sandbox', 'read-only', '--ask-for-approval', 'never'],
   yolo: ['--dangerously-bypass-approvals-and-sandbox'],
 };
 
@@ -72,12 +73,10 @@ function ptyCommand({ binPath, hookCommand, permissionMode } = {}) {
 
 // Headless spawn (brain-chat.js / dailyops-agent.js). Unlike Claude, `codex exec` has no TTY to
 // approve anything even outside the interactive TUI path, so it still needs explicit sandbox +
-// approval flags — ptyCommand's mapping is reused here UNCHANGED. Do not fold this into
-// Claude's headlessCommand or otherwise touch the plan -> sandbox read-only + approval untrusted
-// mapping: whether headless 'plan' should instead map to --ask-for-approval never (no TTY exists to
-// answer an approval prompt) is an open question already with the user — see Finding 1, 2026-07-26
-// whole-branch review. This function exists only so brain-chat/dailyops can call the SAME method
-// name (`adapter.headlessCommand`) on both adapters without a harness-specific branch.
+// approval flags — ptyCommand's mapping is reused here UNCHANGED. The plan mapping is deliberately
+// read-only + never: Codex 0.149.1 removed untrusted, and no TTY exists to answer an approval
+// prompt. This function exists only so brain-chat/dailyops can call the SAME method name
+// (`adapter.headlessCommand`) on both adapters without a harness-specific branch.
 function headlessCommand({ binPath, hookCommand, permissionMode } = {}) {
   return ptyCommand({ binPath, hookCommand, permissionMode });
 }
@@ -141,10 +140,10 @@ module.exports = {
   id: 'codex',
   label: 'Codex',
   bin: 'codex',
-  // Codex reads ~/.codex/prompts/mavis.md but NAMESPACES user prompts, so the command is
-  // /prompts:mavis and typing it at a Claude pane yields "Unknown command". Counterpart to
-  // claude.autorunCommand; config.js treats both as built-ins rather than preferences.
-  autorunCommand: '/prompts:mavis',
+  // The globally installed Mavis skill is Codex's native activation path. `$mavis` selects it
+  // explicitly and carries the project label in the same user message. The deprecated
+  // /prompts:mavis path remains installed for hand-typed compatibility only.
+  autorunCommand: '$mavis',
   resolveBin,
   ptyCommand,
   headlessCommand,

@@ -8,6 +8,10 @@
   const icon = (name, size) => (MT.icons ? MT.icons.svg(name, size) : '');
   let viewHost, sessionsHost, current = 'dashboard', currentSlug = null;
   let renderSeq = 0;
+  // Files and Changes are work surfaces, not disposable reports. Keeping their mounted
+  // fragments preserves editor buffers, selections, scroll positions, and in-progress input
+  // while another page is open. Other views keep their existing render-on-navigation model.
+  const retainedViews = new Map();
   let sidebarCollapsed = false, sidebarToggleBtn = null;
   const navItems = {};
   // Per-session harness picker (titlebar). `harnessPicker` is the dropdown element itself — built
@@ -43,7 +47,19 @@
 
       if (isSession) { MT.session.showActive(); return Promise.resolve(); }
 
+      const retain = view === 'files' || view === 'changes';
+      const retained = retain ? retainedViews.get(view) : null;
+      if (retained) {
+        viewHost.replaceChildren(retained);
+        retained.classList.add('mt-view-in');
+        requestAnimationFrame(() => retained.classList.remove('mt-view-in'));
+        const module = MT[view];
+        if (module && typeof module.onShow === 'function') module.onShow();
+        return Promise.resolve();
+      }
+
       const frag = document.createElement('div');
+      if (retain) retainedViews.set(view, frag);
       let p;
       if (view === 'projects') p = MT.projects.render(frag, MT.openProject);
       else if (view === 'settings') p = MT.settings.render(frag);
@@ -84,8 +100,8 @@
       }
 
       return Promise.resolve(p)
-        .then(() => { settled = true; if (skelTimer) clearTimeout(skelTimer); if (my === renderSeq) { if (view !== prevView) frag.classList.add('mt-view-in'); viewHost.innerHTML = ''; viewHost.appendChild(frag); } })
-        .catch((err) => { settled = true; if (skelTimer) clearTimeout(skelTimer); console.error('[mt-router] view render failed:', view, err); /* clear a stuck skeleton; otherwise leave prior content */ if (my === renderSeq && skeletonShown) viewHost.innerHTML = ''; });
+        .then(() => { settled = true; if (skelTimer) clearTimeout(skelTimer); if (my === renderSeq) { if (view !== prevView) frag.classList.add('mt-view-in'); viewHost.replaceChildren(frag); const module = MT[view]; if (retain && module && typeof module.onShow === 'function') module.onShow(); } })
+        .catch((err) => { settled = true; if (skelTimer) clearTimeout(skelTimer); if (retain && retainedViews.get(view) === frag) retainedViews.delete(view); console.error('[mt-router] view render failed:', view, err); /* clear a stuck skeleton; otherwise leave prior content */ if (my === renderSeq && skeletonShown) viewHost.innerHTML = ''; });
     },
     current() { return current; },
   };

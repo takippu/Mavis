@@ -16,6 +16,7 @@ contextBridge.exposeInMainWorld('mavis', {
   onPtyExit: (cb) => ipcRenderer.on('pty-exit', (_e, p) => cb(p)),
   // status sidecar: { id, state } where state is 'done' | 'await' | 'busy' | 'error' (see session-events.js)
   onSessionState: (fn) => ipcRenderer.on('session:state', (_e, p) => fn(p)),
+  sessionCommands: (id) => ipcRenderer.invoke('session:commands', id),
   clipboardHasImage: () => ipcRenderer.invoke('clipboard:has-image'),
   clipboardPasteImage: () => ipcRenderer.invoke('clipboard:paste-image'),
   appVersion: () => ipcRenderer.invoke('app:version'),
@@ -99,9 +100,11 @@ contextBridge.exposeInMainWorld('mavis', {
   // file browser (Files view) — scoped read/write confined to an absolute root (fs-browser.js)
   filesList: (root, rel) => ipcRenderer.invoke('files:list', { root, rel }),
   filesRead: (root, rel) => ipcRenderer.invoke('files:read', { root, rel }),
+  filesSearch: (root, query, mode) => ipcRenderer.invoke('files:search', { root, query, mode }),
   filesWrite: (root, rel, text) => ipcRenderer.invoke('files:write', { root, rel, text }),
   filesRoot: () => ipcRenderer.invoke('files:root'),
   filesParent: (root) => ipcRenderer.invoke('files:parent', { root }),
+  filesOpenRoot: (path) => ipcRenderer.invoke('files:open-root', { path }),
 
   // git (Changes view) — the renderer never names a repo: it sends the active session's
   // cwd to git:resolve and main derives + remembers the root. Every later call passes
@@ -109,6 +112,7 @@ contextBridge.exposeInMainWorld('mavis', {
   gitResolve: (cwd) => ipcRenderer.invoke('git:resolve', { cwd }),
   gitStatus: (root) => ipcRenderer.invoke('git:status', { root }),
   gitDiff: (root, rel, staged) => ipcRenderer.invoke('git:diff', { root, rel, staged }),
+  gitSearch: (root, query, mode) => ipcRenderer.invoke('git:search', { root, query, mode }),
   gitStage: (root, rels) => ipcRenderer.invoke('git:stage', { root, rels }),
   gitUnstage: (root, rels) => ipcRenderer.invoke('git:unstage', { root, rels }),
   gitDiscard: (root, rels) => ipcRenderer.invoke('git:discard', { root, rels }),

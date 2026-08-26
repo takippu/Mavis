@@ -23,6 +23,7 @@ const TIMEOUT_MS = 20000;
 const MAX_DIFF_ROWS = 4000;            // beyond this the renderer janks; truncate LOUDLY
 const MAX_UNTRACKED_BYTES = 2 * 1024 * 1024;  // same cap fs-browser uses
 const MAX_MESSAGE = 20000;
+const MAX_SEARCH_RESULTS = 200;
 
 // ---- pure helpers (exported for tests) ----
 
@@ -291,6 +292,62 @@ async function diffFile(root, rel, staged) {
   return finish(d);
 }
 
+// Search one parsed diff without losing which side/line matched. Context rows are omitted:
+// Changes search means changed text, while Files content search owns unchanged working-tree text.
+// Exported for unit tests; no git process is needed to verify the matching contract.
+function _searchDiff(diff, query, meta, limit = MAX_SEARCH_RESULTS) {
+  const needle = String(query == null ? '' : query).trim().toLocaleLowerCase();
+  if (!needle || !diff || !Array.isArray(diff.hunks)) return [];
+  const out = [];
+  for (const h of diff.hunks) {
+    for (const row of h.rows || []) {
+      if (row.type === 'ctx') continue;
+      const sides = [
+        { side: 'old', line: row.oldNum, text: row.oldText, type: 'del' },
+        { side: 'new', line: row.newNum, text: row.newText, type: 'add' },
+      ];
+      for (const s of sides) {
+        if (s.text == null || !String(s.text).toLocaleLowerCase().includes(needle)) continue;
+        out.push(Object.assign({}, meta, s, { text: String(s.text).slice(0, 500) }));
+        if (out.length >= limit) return out;
+      }
+    }
+  }
+  return out;
+}
+
+// Search staged and unstaged Changes rows. File mode is path-only and cheap; content mode
+// walks each parsed diff so deleted text remains findable (a working-tree grep cannot do that).
+async function searchChanges(root, query, mode) {
+  const needle = String(query == null ? '' : query).trim().toLocaleLowerCase();
+  const kind = mode === 'content' ? 'content' : 'files';
+  if (!needle) return { results: [], truncated: false };
+  const s = await status(root);
+  if (s.error) return { error: s.error };
+  const rows = [];
+  for (const e of s.unstaged || []) rows.push(Object.assign({ staged: false }, e));
+  for (const e of s.staged || []) rows.push(Object.assign({ staged: true }, e));
+
+  if (kind === 'files') {
+    const matched = rows.filter((e) => String(e.rel).toLocaleLowerCase().includes(needle));
+    return { results: matched.slice(0, MAX_SEARCH_RESULTS), truncated: matched.length > MAX_SEARCH_RESULTS };
+  }
+
+  const results = [];
+  let truncated = false;
+  for (const e of rows) {
+    const diff = await diffFile(root, e.rel, e.staged);
+    if (!diff || diff.error || diff.binary || diff.tooLarge) continue;
+    const room = MAX_SEARCH_RESULTS - results.length;
+    const matches = _searchDiff(diff, needle, {
+      rel: e.rel, name: e.name, dir: e.dir, status: e.status, staged: e.staged,
+    }, room);
+    results.push(...matches);
+    if (results.length >= MAX_SEARCH_RESULTS) { truncated = true; break; }
+  }
+  return { results, truncated };
+}
+
 async function untrackedDiff(root, safe) {
   const abs = path.join(root, safe);
   let st;
@@ -414,8 +471,9 @@ async function checkout(root, name) {
 }
 
 module.exports = {
-  resolveRepo, status, diffFile, stage, unstage, discard, commit, push, branches, checkout,
+  resolveRepo, status, diffFile, searchChanges, stage, unstage, discard, commit, push, branches, checkout,
   safeRel, MAX_DIFF_ROWS,
+  _searchDiff, MAX_SEARCH_RESULTS,
   _buildStatusArgs, _buildDiffArgs, _buildConflictDiffArgs, _buildStageArgs, _buildUnstageArgs, _buildUnstageNoHeadArgs,
   _buildDiscardArgs, _buildRestoreFromHeadArgs, _buildCheckoutArgs, _buildPushArgs, _splitUpstream,
   _validateBranch,

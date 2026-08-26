@@ -244,9 +244,9 @@ export function isDuplicateContract(existing, payload) {
 // Everything below is still pure: it maps (harness, homes, source text) to the list of files
 // the CLI would touch. The CLI owns all reads, writes and printing.
 
-// Codex prompts carry frontmatter with `description` and `argument-hint`, matching the
-// installed opsx-* prompts. The description is lifted from the /mavis source so there is one
-// source of truth for it; only the hint is Codex-specific.
+// Codex prompts carry frontmatter with `description` and `argument-hint`. The native skill is
+// the Codex activation source of truth; the deprecated /prompts:mavis compatibility prompt is
+// rendered from its body so the two paths cannot drift independently.
 export const CODEX_ARGUMENT_HINT = 'optional project name or question';
 
 const FRONTMATTER_RE = /^---\n([\s\S]*?)\n---\n?/;
@@ -266,8 +266,8 @@ export function parseFrontmatter(text) {
 }
 
 // The /mavis body as Codex wants it: its own frontmatter, then the shared body.
-export function codexPrompt(slashSource, argumentHint = CODEX_ARGUMENT_HINT) {
-  const { body, fields } = parseFrontmatter(slashSource);
+export function codexPrompt(skillSource, argumentHint = CODEX_ARGUMENT_HINT) {
+  const { body, fields } = parseFrontmatter(skillSource);
   const description = fields.description || 'Load Mavis - long-term memory + project collaborator.';
   return `---\ndescription: ${description}\nargument-hint: ${argumentHint}\n---\n\n${body}`;
 }
@@ -276,17 +276,30 @@ function posix(p) {
   return p.split(path.sep).join('/');
 }
 
-// homes: { claudeHome, codexHome, invariants, slash, outputStyle }
+// homes: { claudeHome, codexHome, agentsHome, invariants, slash, codexSkill,
+//          codexPromptSource, outputStyle }
 //   claudeHome / codexHome - absolute paths to ~/.claude and ~/.codex
+//   agentsHome             - absolute path to ~/.agents (Codex's personal skill root)
 //   invariants             - text of mavis/global-invariants.md (spliced between markers)
-//   slash                  - text of mavis/slash-mavis.md (whole-file targets)
+//   slash                  - text of mavis/slash-mavis.md (Claude whole-file target)
+//   codexSkill             - rendered native Codex SKILL.md
+//   codexPromptSource      - same skill source, rendered with $ARGUMENTS as invocation input
 //   outputStyle            - text of mavis/output-style-terse.md (whole-file, Claude ONLY:
 //                            Codex has no output-style concept, so its branch omits it)
 // Each target: { kind, mode, label, path, payload }
 //   kind 'global' targets are gated behind --global; 'prompt' targets always install.
 //   mode 'splice' preserves non-Mavis content; mode 'whole' replaces the file.
 export function targetsFor(harness, homes) {
-  const { claudeHome, codexHome, invariants = '', slash = '', outputStyle = '' } = homes || {};
+  const {
+    claudeHome,
+    codexHome,
+    agentsHome,
+    invariants = '',
+    slash = '',
+    codexSkill = '',
+    codexPromptSource = '',
+    outputStyle = '',
+  } = homes || {};
   if (harness === 'claude') {
     if (!claudeHome) throw new Error('targetsFor("claude") needs homes.claudeHome');
     const claudeTargets = [
@@ -321,6 +334,7 @@ export function targetsFor(harness, homes) {
   }
   if (harness === 'codex') {
     if (!codexHome) throw new Error('targetsFor("codex") needs homes.codexHome');
+    if (!agentsHome) throw new Error('targetsFor("codex") needs homes.agentsHome');
     return [
       {
         kind: 'global',
@@ -334,7 +348,14 @@ export function targetsFor(harness, homes) {
         mode: 'whole',
         label: '~/.codex/prompts/mavis.md',
         path: posix(path.join(codexHome, 'prompts', 'mavis.md')),
-        payload: codexPrompt(slash),
+        payload: codexPrompt(codexPromptSource),
+      },
+      {
+        kind: 'activation',
+        mode: 'whole',
+        label: '~/.agents/skills/mavis/SKILL.md',
+        path: posix(path.join(agentsHome, 'skills', 'mavis', 'SKILL.md')),
+        payload: String(codexSkill).replace(/\r\n?/g, '\n'),
       },
     ];
   }

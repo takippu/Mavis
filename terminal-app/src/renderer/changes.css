@@ -18,6 +18,28 @@
   font-size: 12px; border-radius: var(--radius-pill); padding: 3px 10px;
   border: 1px solid var(--hairline); background: var(--color-fog); color: var(--color-ash); }
 .mt-chg-branch { color: var(--color-rust); background: var(--color-apricot-wash); border-color: transparent; cursor: pointer; }
+.mt-chg-search { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.mt-chg-search-mode {
+  display: inline-flex; padding: 2px; border-radius: var(--radius-pill);
+  background: var(--color-fog);
+}
+.mt-chg-search-mode-btn {
+  border: 0; background: transparent; color: var(--color-graphite); cursor: pointer;
+  border-radius: var(--radius-pill); padding: 4px 8px; font: inherit; font-size: 10px; font-weight: 500;
+}
+.mt-chg-search-mode-btn.active { background: var(--btn-bg); color: var(--btn-fg); }
+.mt-chg-search-mode-btn:focus-visible { outline: 2px solid var(--color-rust); outline-offset: 2px; }
+.mt-chg-search-field {
+  width: min(260px, 24vw); min-width: 150px; display: flex; align-items: center; gap: 6px;
+  padding: 5px 8px; border-radius: 8px; background: var(--color-fog); color: var(--color-graphite);
+}
+.mt-chg-search-field:focus-within { box-shadow: 0 0 0 2px var(--color-rust); }
+.mt-chg-search-ico { display: inline-flex; flex: none; }
+.mt-chg-search-field input {
+  min-width: 0; width: 100%; border: 0; outline: 0; background: transparent;
+  color: var(--color-ink); font: inherit; font-size: 11px;
+}
+.mt-chg-search-field input::placeholder { color: var(--color-dove); }
 .mt-chg-spacer { flex: 1; }
 .mt-chg-btn { font-size: 12px; border: 1px solid var(--hairline); background: var(--color-pure-white);
   color: var(--color-ash); border-radius: 8px; padding: 4px 10px; cursor: pointer; }
@@ -31,6 +53,9 @@
 .mt-chg-rail-collapsed .mt-chg-f-dir,
 .mt-chg-rail-collapsed .mt-chg-ck,
 .mt-chg-rail-collapsed .mt-chg-sec,
+.mt-chg-rail-collapsed .mt-chg-search-result,
+.mt-chg-rail-collapsed .mt-chg-search-summary,
+.mt-chg-rail-collapsed .mt-chg-search-note,
 .mt-chg-rail-collapsed .mt-chg-commit { display: none; }
 /* Rail-SCOPED: .mt-chg-empty is also the diff pane's empty state (and its { error }
    sentinel text). A bare .mt-chg-empty here would hide git's error messages whenever the
@@ -66,6 +91,26 @@
 .mt-chg-commit-btn { width: 100%; margin-top: 6px; font-size: 12px; border: 0; border-radius: 8px;
   padding: 6px; background: var(--btn-bg); color: var(--btn-fg); cursor: pointer; }
 .mt-chg-commit-btn:disabled { opacity: .4; cursor: default; }
+.mt-chg-search-summary {
+  padding: 5px 10px 7px; color: var(--color-dove); font-size: 9px;
+  text-transform: uppercase; letter-spacing: .06em; font-weight: 600;
+}
+.mt-chg-search-note { padding: 10px; color: var(--color-graphite); font-size: 11px; line-height: 1.45; }
+.mt-chg-search-result {
+  display: flex; align-items: flex-start; gap: 7px; padding: 6px 10px;
+  color: var(--color-ash); cursor: pointer; min-width: 0;
+}
+.mt-chg-search-result:hover, .mt-chg-search-result:focus-visible { background: var(--color-fog); outline: none; }
+.mt-chg-search-result.selected { background: var(--color-apricot-wash); color: var(--color-rust); }
+.mt-chg-search-copy { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.mt-chg-search-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 600; }
+.mt-chg-search-path, .mt-chg-search-snip {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: var(--color-dove); font-family: var(--font-mono); font-size: 9px;
+}
+.mt-chg-search-snip { color: var(--color-graphite); }
+.mt-chg-search-snip.add { color: var(--st-add); }
+.mt-chg-search-snip.del { color: var(--st-del); }
 
 .mt-chg-diff { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--color-pure-white); }
 .mt-chg-empty { padding: 20px; color: var(--color-graphite); font-size: 13px; }
@@ -94,11 +139,18 @@
 .mt-chg-ln.add { background: var(--diff-add-bg); box-shadow: inset 2px 0 0 var(--diff-add-gut); }
 .mt-chg-ln.del { background: var(--diff-del-bg); box-shadow: inset 2px 0 0 var(--diff-del-gut); }
 .mt-chg-ln.gap { background: var(--diff-gap-bg); }
+.mt-chg-ln.search-hit { position: relative; z-index: 0; outline: 2px solid var(--color-rust); outline-offset: -2px; }
 .mt-chg-n { color: var(--color-dove); width: 34px; text-align: right; flex: none; font-size: 10px;
   user-select: none; }
 .mt-chg-c { overflow: hidden; text-overflow: clip; }
 .mt-chg-trunc { padding: 8px 10px; font-size: 11px; color: var(--color-rust);
   background: var(--color-apricot-wash); flex: none; }
+
+@media (max-width: 980px) {
+  .mt-chg-head { flex-wrap: wrap; }
+  .mt-chg-search { order: 3; width: 100%; }
+  .mt-chg-search-field { flex: 1; width: auto; }
+}
 
 /* ---------- dark surface: the four dark app themes ---------- */
 /* ink / nocturne / xai / resend invert --color-pure-white to near-black and --color-ash to a

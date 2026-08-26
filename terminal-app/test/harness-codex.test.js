@@ -4,6 +4,10 @@ const test = require('node:test');
 const assert = require('node:assert');
 const codex = require('../src/harness/codex');
 
+test('native Mavis autorun explicitly selects the globally installed skill', () => {
+  assert.strictEqual(codex.autorunCommand, '$mavis');
+});
+
 test('ptyCommand wraps the .cmd shim exactly like claude does', () => {
   const c = codex.ptyCommand({ binPath: 'C:/npm/codex.cmd', permissionMode: 'default' });
   assert.match(c.file, /cmd\.exe$/i);
@@ -29,16 +33,17 @@ test('permissionArgs maps the four Mavis modes onto sandbox + approval policy', 
   assert.deepStrictEqual(codex.permissionArgs('acceptEdits'),
     ['--sandbox', 'workspace-write', '--ask-for-approval', 'on-request']);
   assert.deepStrictEqual(codex.permissionArgs('plan'),
-    ['--sandbox', 'read-only', '--ask-for-approval', 'untrusted']);
+    ['--sandbox', 'read-only', '--ask-for-approval', 'never']);
   assert.deepStrictEqual(codex.permissionArgs('yolo'),
     ['--dangerously-bypass-approvals-and-sandbox']);
 });
 
-test('permissionArgs never emits Codex 0.146 removed approval syntax', () => {
+test('permissionArgs never emits approval syntax removed by Codex 0.149.1', () => {
   for (const mode of ['default', 'acceptEdits', 'plan', 'yolo']) {
     const args = codex.permissionArgs(mode);
     assert.ok(!args.includes('--approval-policy'), `${mode} uses removed --approval-policy`);
     assert.ok(!args.includes('on-failure'), `${mode} uses removed on-failure policy`);
+    assert.ok(!args.includes('untrusted'), `${mode} uses removed untrusted policy`);
   }
 });
 
@@ -68,11 +73,11 @@ test('ptyCommand adds no hook-trust bypass when no Mavis hook is injected', () =
   assert.ok(!c.args.includes('--dangerously-bypass-hook-trust'));
 });
 
-test('headlessCommand reuses ptyCommand UNCHANGED — codex still needs sandbox/approval flags headlessly (Finding 1, 2026-07-26 review, deliberately not touched)', () => {
+test('headlessCommand reuses the non-interactive read-only plan mapping', () => {
   const h = codex.headlessCommand({ binPath: 'c.exe', permissionMode: 'plan' });
   const p = codex.ptyCommand({ binPath: 'c.exe', permissionMode: 'plan' });
   assert.deepStrictEqual(h, p, 'headlessCommand delegates straight to ptyCommand, no divergence');
-  assert.deepStrictEqual(h.args, ['--sandbox', 'read-only', '--ask-for-approval', 'untrusted']);
+  assert.deepStrictEqual(h.args, ['--sandbox', 'read-only', '--ask-for-approval', 'never']);
 });
 
 test('headlessArgs passes the prompt as a positional arg, not stdin', () => {

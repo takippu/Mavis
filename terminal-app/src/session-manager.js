@@ -12,7 +12,7 @@ const harnessRegistry = require('./harness');
 
 class SessionManager {
   constructor({ onData, onExit, spawn, spawnShell } = {}) {
-    this.sessions = new Map(); // id -> { term, label, cwd, kind, harness, token, autorunDone, autorunTimer }
+    this.sessions = new Map(); // id -> { term, label, cwd, kind, harness, token, startedAt, transcript metadata, timers }
     this.onData = onData || (() => {});
     this.onExit = onExit || (() => {});
     this._spawn = spawn || startAgentPty;
@@ -37,6 +37,9 @@ class SessionManager {
       kind: isShell ? 'shell' : 'mavis',
       harness: harnessId,
       token,
+      startedAt: Date.now(),
+      transcriptSessionId: null,
+      transcriptPath: null,
       autorunDone: false,
       autorunTimer: null,
       enterTimer: null,
@@ -128,6 +131,30 @@ class SessionManager {
 
   has(id) { return this.sessions.has(id); }
   get size() { return this.sessions.size; }
+
+  // Main-process readers resolve a renderer's live pty id through this method. Return only the
+  // session metadata needed to derive a transcript; never expose the PTY object or mutable record.
+  info(id) {
+    const s = this.sessions.get(id);
+    if (!s) return null;
+    return {
+      id,
+      cwd: s.cwd,
+      kind: s.kind,
+      harness: s.harness,
+      startedAt: s.startedAt,
+      sessionId: s.transcriptSessionId,
+      transcriptPath: s.transcriptPath,
+    };
+  }
+
+  setTranscriptMeta(id, { sessionId, transcriptPath } = {}) {
+    const s = this.sessions.get(id);
+    if (!s) return false;
+    if (typeof sessionId === 'string' && sessionId.trim()) s.transcriptSessionId = sessionId.trim();
+    if (typeof transcriptPath === 'string' && transcriptPath.trim()) s.transcriptPath = transcriptPath.trim();
+    return true;
+  }
 
   // Session id -> its sidecar token; the inverse of idForToken. No production caller — close()
   // reads `s.token` off the record directly rather than going through this — but it is NOT dead

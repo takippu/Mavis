@@ -16,14 +16,14 @@ test('defaults: Claude autoruns /mavis, delay 1500, font 13', () => {
   assert.strictEqual(c.TERMINAL_FONT_SIZE, 13);
 });
 
-test('Codex defaults to its namespaced Mavis prompt', () => {
+test('Codex defaults to explicit native Mavis skill activation', () => {
   const d = tmp();
   fs.writeFileSync(path.join(d, 'settings.json'), JSON.stringify({ harness: 'codex' }));
   const c = config.load(d);
   assert.strictEqual(c.HARNESS, 'codex');
-  assert.strictEqual(c.AUTORUN_COMMAND, '/prompts:mavis');
+  assert.strictEqual(c.AUTORUN_COMMAND, '$mavis');
   assert.strictEqual(c.autorunCommandForHarness('claude'), '/mavis');
-  assert.strictEqual(c.autorunCommandForHarness('codex'), '/prompts:mavis');
+  assert.strictEqual(c.autorunCommandForHarness('codex'), '$mavis');
   fs.rmSync(d, { recursive: true, force: true });
 });
 
@@ -52,7 +52,7 @@ test('a stale OTHER-harness built-in is ignored, not typed at the wrong CLI', ()
   fs.writeFileSync(path.join(d, 'settings.json'), JSON.stringify({ harness: 'claude', autorunCommand: '/prompts:mavis' }));
   const c = config.load(d);
   assert.strictEqual(c.AUTORUN_COMMAND, '/mavis', 'claude pane gets claude\'s command');
-  assert.strictEqual(c.autorunCommandForHarness('codex'), '/prompts:mavis', 'codex pane still gets its own');
+  assert.strictEqual(c.autorunCommandForHarness('codex'), '$mavis', 'codex pane still gets its own');
   fs.rmSync(d, { recursive: true, force: true });
 });
 
@@ -60,7 +60,16 @@ test('the mirror case is ignored too: claude built-in pinned while harness is co
   const d = tmp();
   fs.writeFileSync(path.join(d, 'settings.json'), JSON.stringify({ harness: 'codex', autorunCommand: '/mavis' }));
   const c = config.load(d);
-  assert.strictEqual(c.AUTORUN_COMMAND, '/prompts:mavis');
+  assert.strictEqual(c.AUTORUN_COMMAND, '$mavis');
+  assert.strictEqual(c.autorunCommandForHarness('claude'), '/mavis');
+  fs.rmSync(d, { recursive: true, force: true });
+});
+
+test('the deprecated Codex prompt setting migrates to native $mavis', () => {
+  const d = tmp();
+  fs.writeFileSync(path.join(d, 'settings.json'), JSON.stringify({ harness: 'codex', autorunCommand: '/prompts:mavis' }));
+  const c = config.load(d);
+  assert.strictEqual(c.AUTORUN_COMMAND, '$mavis');
   assert.strictEqual(c.autorunCommandForHarness('claude'), '/mavis');
   fs.rmSync(d, { recursive: true, force: true });
 });

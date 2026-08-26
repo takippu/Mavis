@@ -1,0 +1,27 @@
+.mt-cmd-overlay { position: fixed; inset: 0; z-index: 760; display: flex; justify-content: flex-end; background: rgba(14,15,17,.42); opacity: 0; transition: opacity 180ms ease; }
+.mt-cmd-overlay.in { opacity: 1; }
+.mt-cmd-panel { width: min(620px, 46vw); height: 100%; display: flex; flex-direction: column; background: var(--color-pure-white); color: var(--color-ink); border-left: 1px solid var(--hairline); box-shadow: -24px 0 60px rgba(20,20,18,.18); transform: translateX(24px); transition: transform 180ms ease; }
+.mt-cmd-overlay.in .mt-cmd-panel { transform: translateX(0); }
+.mt-cmd-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 24px 24px 12px; }
+.mt-cmd-kicker { margin-bottom: 4px; color: var(--color-rust); font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+.mt-cmd-title { margin: 0; font-family: var(--font-sohne); font-size: 28px; font-weight: 500; letter-spacing: -.025em; }
+.mt-cmd-close { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border: 1px solid var(--hairline); border-radius: 8px; background: transparent; color: inherit; cursor: pointer; }
+.mt-cmd-close:hover { border-color: var(--color-rust); color: var(--color-rust); }
+.mt-cmd-note { margin: 0; padding: 0 24px 18px; color: var(--color-graphite); font-size: 12px; border-bottom: 1px solid var(--hairline); }
+.mt-cmd-body { flex: 1; min-height: 0; overflow: auto; padding: 18px 24px 32px; }
+.mt-cmd-card { overflow: hidden; margin-bottom: 14px; border: 1px solid var(--hairline); border-radius: 12px; background: var(--term-bg); }
+.mt-cmd-card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 10px 9px 13px; color: #d7d6d1; border-bottom: 1px solid rgba(255,255,255,.09); }
+.mt-cmd-meta { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.mt-cmd-language { font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #c98c72; }
+.mt-cmd-older { font-size: 10px; color: #8f918d; }
+.mt-cmd-copy { min-width: 64px; padding: 6px 11px; border: 1px solid rgba(255,255,255,.16); border-radius: 7px; background: rgba(255,255,255,.06); color: #f3f1ec; font: inherit; font-size: 11px; cursor: pointer; }
+.mt-cmd-copy:hover, .mt-cmd-copy.copied { border-color: #c98c72; background: rgba(201,140,114,.14); }
+.mt-cmd-code { max-height: 360px; overflow: auto; margin: 0; padding: 15px 16px 18px; color: #e8e6e0; font: 12px/1.58 'Cascadia Mono', Consolas, monospace; white-space: pre; tab-size: 2; }
+.mt-cmd-empty, .mt-cmd-loading { padding: 44px 24px; text-align: center; color: var(--color-graphite); }
+.mt-cmd-empty-title { margin-bottom: 7px; color: var(--color-ink); font-family: var(--font-sohne); font-size: 21px; }
+.mt-cmd-empty p { max-width: 360px; margin: 0 auto; font-size: 12px; line-height: 1.6; }
+.mt-pane-command-btn { gap: 5px; width: auto; padding-inline: 6px; }
+.mt-pane-command-label { font-size: 10px; line-height: 1; }
+.mt-pane-command-btn:disabled { opacity: .22; cursor: default; }
+@media (max-width: 940px) { .mt-cmd-panel { width: min(680px, 78vw); } .mt-pane-command-label { display: none; } }
+@media (prefers-reduced-motion: reduce) { .mt-cmd-overlay, .mt-cmd-panel { transition: none; } }

@@ -125,11 +125,11 @@ Capture: `<domain>`.
 
 Capture: `<initial-preferences: list>`.
 
-#### Q7 — Global slash command (optional)
+#### Q7 — Global harness activation (optional)
 
-> "Last thing. Right now you can only load Mavis when you open Claude Code from THIS folder (the brain repo). That means every time you want me, you have to `cd` here first.
+> "Last thing. Right now you can only load Mavis automatically when a harness starts inside this brain repo.
 >
-> Want me to install a `/mavis` slash command at the user level (`~/.claude/commands/mavis.md`)? Once installed, you can `cd` to any project folder — `acme-portal`, your side project, whatever — open Claude Code there, and type `/mavis`. I'll load the full brain from this absolute path regardless of cwd, and if you're inside a folder I know about, I'll greet you with that project's context already in hand.
+> Want me to install global Mavis activation? Once installed, you can open either supported harness from any project folder. Claude Code uses `/mavis <project>`. Codex uses plain `mavis <project>` or the explicit `$mavis <project>` skill invocation; its deprecated `/prompts:mavis <project>` form remains available for compatibility. Every form loads this brain from its absolute path rather than relying on cwd.
 >
 > Install? (yes/no, default yes)"
 
@@ -148,7 +148,7 @@ Before writing, summarize:
 > - Disagreement: `<disagreement-style>`. Ambiguity: `<ambiguity-style>`
 > - Domain: `<domain>`
 > - Initial preferences: `<count>` entries
-> - Install `/mavis` slash command at user level: `<install-slash>`
+> - Install global Mavis activation: `<install-slash>`
 >
 > Sound right? (yes / change <field>)"
 
@@ -469,9 +469,9 @@ If `<HOME>/.claude/commands/mavis.md` already exists, show its current contents 
 
 **Ordering is load-bearing — this step MUST run after `identity/profile.md` has been written to disk (see above), never earlier.** `install-harness.mjs` resolves its `{{USER_NAME}}` placeholder by reading `identity/profile.md` directly off disk, and it does this before anything else, including a dry run — it FAILS LOUDLY (a thrown error, exit 1, nothing written) if that file is missing or has no `name:` field. During the Q&A phase `<name>` only exists as a captured answer, not yet a file, so this step cannot run there. If a future edit moves this step earlier in the wizard, setup breaks for every user who reaches it before `identity/profile.md` lands on disk — don't reorder it.
 
-**What this installs.** `install-harness.mjs` writes the global invariants (spliced between `<!-- mavis:begin -->` / `<!-- mavis:end -->` markers, so any of the user's own content in the target file survives) and the `/mavis` prompt into whichever harness home(s) the user picks — `~/.claude/CLAUDE.md` + `~/.claude/commands/mavis.md` for Claude, `~/.codex/AGENTS.md` + `~/.codex/prompts/mavis.md` for Codex. It supersedes the hand-written `~/.claude/commands/mavis.md` template above: if the user opted into `<install-slash>` there and also picks Claude here, this step's write simply replaces that file with the canonical script-generated version (backing up the previous copy to `<file>.mavis-bak` automatically) — that's expected, not a conflict, and needs no separate handling.
+**What this installs.** `install-harness.mjs` writes the global invariants (spliced between `<!-- mavis:begin -->` / `<!-- mavis:end -->` markers, so any of the user's own content in the target file survives) plus each harness's native activation. Claude receives `~/.claude/CLAUDE.md` + `~/.claude/commands/mavis.md`. Codex receives `~/.codex/AGENTS.md` + the native `~/.agents/skills/mavis/SKILL.md` + a deprecated `~/.codex/prompts/mavis.md` compatibility prompt rendered from the same skill source with `$ARGUMENTS`. It supersedes the hand-written `~/.claude/commands/mavis.md` template above: if the user opted into `<install-slash>` there and also picks Claude here, this step's write simply replaces that file with the canonical script-generated version (backing up the previous copy to `<file>.mavis-bak` automatically) — that's expected, not a conflict, and needs no separate handling.
 
-**Both `~/.claude/` and `~/.codex/` are outside this repo.** Per the standing approval-before-mutations rule, nothing gets written there without the user seeing the exact change first and saying go — dry run first, always, no exceptions.
+**`~/.claude/`, `~/.codex/`, and `~/.agents/` are outside this repo.** Per the standing approval-before-mutations rule, nothing gets written there without the user seeing the exact change first and saying go — dry run first, always, no exceptions.
 
 1. **Run the detector.** It's also a dry run and writes nothing:
 
@@ -485,7 +485,7 @@ If `<HOME>/.claude/commands/mavis.md` already exists, show its current contents 
 
 3. **Ask which to wire**, offering only what was detected, plus "skip for now":
 
-   > "I found Claude: `<yes/no>`, Codex: `<yes/no>` on your PATH. Want me to install the Mavis contract and `/mavis` command into Claude, Codex, both, or skip this for now?
+   > "I found Claude: `<yes/no>`, Codex: `<yes/no>` on your PATH. Want me to install the Mavis contract and native activation into Claude, Codex, both, or skip this for now? Claude uses `/mavis`; Codex uses plain `mavis <project>` or explicit `$mavis <project>`.
    >
    > **Codex is optional.** If you don't use it, or it isn't installed, choosing Claude-only — or skipping this entirely — is a complete, fully supported setup. Nothing about Mavis degrades without Codex."
 
@@ -566,7 +566,7 @@ Then proceed with the user's next request as Mavis.
 
 ---
 
-## Slash command setup (standalone)
+## Harness activation setup (standalone)
 
 ### When to run
 
@@ -577,23 +577,19 @@ Also runs as **Q7** of the setup wizard if the user opts in there.
 
 ### Steps
 
-1. **Capture the absolute brain path** (`<BRAIN_PATH>`): the directory containing the running `CLAUDE.md`. Use `pwd` (Bash) or `Get-Location` (PowerShell). On Windows expect a path like `C:\Users\<name>\Documents\Projects\Mavis`.
-2. **Capture the user home** (`<HOME>`): `%USERPROFILE%` on Windows, `$HOME` on macOS/Linux.
-3. **Ensure** `<HOME>/.claude/commands/` exists. Create it if missing.
-4. **If** `<HOME>/.claude/commands/mavis.md` **already exists**: read its current content, show it to the user, and ask `"Slash command file already exists. Overwrite? (yes/no)"`. If no, abort with `"Skipped — existing file kept as-is."`.
-5. **Write** `<HOME>/.claude/commands/mavis.md` with the template defined in the wizard's file-generation section above. Substitute `<BRAIN_PATH>` everywhere — don't leave the placeholder.
-6. **Confirm to user**:
+Use the complete **Harness install — Claude / Codex** procedure above: detect installed harnesses, run the scoped dry run, show every target and diff, obtain approval, then apply with `--yes`. Do not manually install only one Codex file — Codex support is complete only when the installer places the global contract, native `~/.agents/skills/mavis/SKILL.md`, and deprecated compatibility prompt together.
 
-   > "Slash command installed at `<HOME>/.claude/commands/mavis.md`.
-   >
-   > From now on, open Claude Code in any folder and type `/mavis` — I'll load the full brain from `<BRAIN_PATH>` regardless of cwd. If you're inside a folder I recognize as one of your projects, I'll greet you with that project's context already in hand.
-   >
-   > To uninstall, delete `<HOME>/.claude/commands/mavis.md`."
+After installation, confirm the supported syntax:
+- Claude Code: `/mavis <project>`.
+- Codex implicit: `mavis <project>`.
+- Codex explicit and recommended for deterministic selection: `$mavis <project>`.
+- Codex compatibility: `/prompts:mavis <project>`.
+- Exact `/mavis` is Claude-only; Codex 0.146 rejects it as an unrecognized command.
 
 ### When to update vs. recreate
 
-- **Brain moves to a different folder**: update the `<BRAIN_PATH>` references in `<HOME>/.claude/commands/mavis.md`. The user can re-run this protocol to regenerate.
-- **Brain structure changes** (new auto-load step, new top-level file): update the template in this `SETUP.md` AND re-run this protocol so the user's installed slash command reflects the new behavior.
+- **Brain moves to a different folder**: re-run `scripts/install-harness.mjs` so every installed activation target receives the new absolute path.
+- **Brain structure changes** (new auto-load step, new top-level file): update the relevant source under `mavis/` and re-run this protocol so the installed activation reflects the new behavior.
 
 ---
 
@@ -682,7 +678,7 @@ For an existing Mavis user who set up **before** the two-tier migration and just
 - The user says **`recalibrate mavis`** / **`migrate mavis`** / **`migrate to new format`** / **`upgrade mavis`** / **`upgrade brain`**, OR
 - **Auto-offer at boot:** during auto-load you notice `preferences/_index.md` is ABSENT but a legacy source exists (`identity/preferences.md`, or `topic_index.md` / `topic_details/`). Say so once and OFFER to recalibrate — don't force it (the legacy fallback keeps the brain usable meanwhile).
 - **Auto-offer at boot (portability):** during auto-load you notice `AGENTS.md` is ABSENT at the brain root but `CLAUDE.md` IS present. This is a pre-portability brain — it predates the layout where `AGENTS.md` is the canonical contract and `CLAUDE.md` is generated from it, which is what lets the same contract drive both Claude Code and Codex. Say so once and OFFER to run the migration under "Portability offers" below — don't force it; `CLAUDE.md` alone keeps Claude Code working meanwhile.
-- **Auto-offer at boot (Codex support):** during auto-load you notice `~/.codex/` exists (Codex is installed on this machine) but `~/.codex/AGENTS.md` does not (Codex has never been wired to this brain). Say so once and OFFER to install Codex support via "Portability offers" below — don't force it; this is purely additive and Codex remains optional everywhere in this brain.
+- **Auto-offer at boot (Codex support):** during auto-load you notice `~/.codex/` exists (Codex is installed on this machine) but either `~/.codex/AGENTS.md` or `~/.agents/skills/mavis/SKILL.md` is absent. Say so once and OFFER to install Codex support via "Portability offers" below — don't force it; this is purely additive and Codex remains optional everywhere in this brain.
 - **Auto-offer at boot (attribution hook):** during auto-load you notice `git config --global core.hooksPath` is unset. Say so once and OFFER to enable it — see "Portability offers" below for the exact procedure — don't force it; the no-attribution rule still applies from context even without the mechanical backstop, this just adds one.
 
 ### What it does
@@ -706,7 +702,7 @@ Reference migration scripts live in `terminal-app/scripts/migrate/` (Node), but 
 
 ### Portability offers (AGENTS.md canonical contract, Codex support)
 
-Two further offers live in this protocol, independent of the two-tier data migration above and of each other — a brain can need one, both, or neither. Both write **tracked repo files** (`AGENTS.md` / `CLAUDE.md`) or files **outside the repo** (`~/.codex/...`), not personal gitignored brain data, so treat both with the same care as any other mutation: show the exact change, get explicit approval, and — per the standing "never commit or push unbidden" rule — never stage or commit on the user's behalf without them saying so in that message.
+Two further offers live in this protocol, independent of the two-tier data migration above and of each other — a brain can need one, both, or neither. Both write **tracked repo files** (`AGENTS.md` / `CLAUDE.md`) or files **outside the repo** (`~/.codex/...` and `~/.agents/...`), not personal gitignored brain data, so treat both with the same care as any other mutation: show the exact change, get explicit approval, and — per the standing "never commit or push unbidden" rule — never stage or commit on the user's behalf without them saying so in that message.
 
 **Offer 1 — promote `AGENTS.md` to canonical.**
 
@@ -726,7 +722,7 @@ On yes:
 
 **Offer 2 — install Codex support.**
 
-Detect: `~/.codex/` exists (or `$CODEX_HOME`, if set) but `~/.codex/AGENTS.md` (or `$CODEX_HOME/AGENTS.md`) does not.
+Detect: `~/.codex/` exists (or `$CODEX_HOME`, if set) but either `~/.codex/AGENTS.md` (or `$CODEX_HOME/AGENTS.md`) or the native `~/.agents/skills/mavis/SKILL.md` is absent.
 
 If detected, offer: "You have Codex installed but it isn't wired to this brain yet. Want me to install Codex support the same way the setup wizard does?" On yes, run the identical dry-run-first / show-the-diff / explicit-go / handle-`REFUSED` procedure documented in the wizard's "Harness install" step, scoped to Codex:
 
@@ -740,7 +736,7 @@ then, only after the user explicitly approves the shown diff:
 node scripts/install-harness.mjs --harness codex --global --yes
 ```
 
-Codex stays optional everywhere else in this brain; this offer exists purely so a user who installs Codex later doesn't have to remember to come back and ask for it themselves.
+Codex stays optional everywhere else in this brain; this offer exists purely so a user who installs Codex later receives the complete integration — global contract, native skill, and compatibility prompt — without having to request each part.
 
 **Offer 3 — enable the attribution-trailer git hook.**
 

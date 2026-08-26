@@ -9,6 +9,8 @@ import {
   spliceMarkers,
   detectHarnesses,
   isDuplicateContract,
+  codexPrompt,
+  parseFrontmatter,
   resolvePlaceholders,
   stripMarkerBlock,
   targetsFor,
@@ -346,6 +348,42 @@ test('the committed /mavis prompt is portable too, and resolves to real absolute
   }
 });
 
+test('the committed Codex skill has valid trigger metadata and portable activation instructions', () => {
+  const parsed = parseFrontmatter(RAW_CODEX_SKILL);
+  assert.equal(parsed.fields.name, 'mavis');
+  assert.ok(parsed.fields.description.includes('mavis sample-project'));
+  assert.ok(parsed.fields.description.includes('$mavis'));
+  assert.ok(parsed.fields.description.includes('resume sample-project with mavis'));
+  assert.ok(RAW_CODEX_SKILL.includes('{{BRAIN_ROOT}}/AGENTS.md'));
+  assert.ok(RAW_CODEX_SKILL.includes('{{INVOCATION_INPUT}}'));
+  assert.equal(/CLAUDE\.md|topic_index\.md|Steps? 0.?7/i.test(RAW_CODEX_SKILL), false);
+  assert.equal(/[A-Za-z]:[\\/]Users[\\/]/.test(RAW_CODEX_SKILL), false);
+
+  const values = {
+    USER_NAME: 'Ada',
+    BRAIN_ROOT: 'D:/brains/mavis',
+    INVOCATION_INPUT: 'the complete user request that activated this skill',
+  };
+  const out = resolvePlaceholders(RAW_CODEX_SKILL, values);
+  assert.ok(out.includes('`D:/brains/mavis/AGENTS.md`'));
+  assert.ok(out.includes('Prefer a matching explicit project over current-directory detection.'));
+  assert.ok(!out.includes('{{'));
+});
+
+test('the Codex compatibility prompt is rendered from the skill and consumes $ARGUMENTS', () => {
+  const source = resolvePlaceholders(RAW_CODEX_SKILL, {
+    USER_NAME: 'Ada',
+    BRAIN_ROOT: 'D:/brains/mavis',
+    INVOCATION_INPUT: '`$ARGUMENTS` supplied to `/prompts:mavis`',
+  });
+  const out = codexPrompt(source);
+  assert.ok(out.startsWith('---\n'));
+  assert.ok(out.includes('argument-hint: optional project name or question'));
+  assert.ok(out.includes('$ARGUMENTS'));
+  assert.ok(out.includes('D:/brains/mavis/AGENTS.md'));
+  assert.equal(/CLAUDE\.md|topic_index\.md|Steps? 0.?7/i.test(out), false);
+});
+
 // --- output style: portability + the Claude-only target -------------------------------------
 
 test('the committed output style is portable and carries no machine path', () => {
@@ -370,7 +408,10 @@ test('the output style governs length only and does not restate compaction-proof
 });
 
 test('targetsFor adds the output style to claude, and never to codex', () => {
-  const homes = { claudeHome: '/h/.claude', codexHome: '/h/.codex', invariants: 'i', slash: 's', outputStyle: 'o' };
+  const homes = {
+    claudeHome: '/h/.claude', codexHome: '/h/.codex', agentsHome: '/h/.agents',
+    invariants: 'i', slash: 's', codexSkill: 'skill', codexPromptSource: 'prompt', outputStyle: 'o',
+  };
   const claude = targetsFor('claude', homes);
   const styles = claude.filter(t => t.label.includes('output-styles'));
   assert.equal(styles.length, 1);
@@ -407,6 +448,8 @@ const RAW_INVARIANTS = fs.readFileSync(path.join(ROOT, 'mavis', 'global-invarian
   .replace(/\r\n?/g, '\n');
 const RAW_SLASH = fs.readFileSync(path.join(ROOT, 'mavis', 'slash-mavis.md'), 'utf8')
   .replace(/\r\n?/g, '\n');
+const RAW_CODEX_SKILL = fs.readFileSync(path.join(ROOT, 'mavis', 'codex-skill', 'SKILL.md'), 'utf8')
+  .replace(/\r\n?/g, '\n');
 const RAW_STYLE = fs.readFileSync(path.join(ROOT, 'mavis', 'output-style-terse.md'), 'utf8')
   .replace(/\r\n?/g, '\n');
 const FIXTURE_NAME = 'Fixture Person';
@@ -416,6 +459,14 @@ const toPosix = (p) => p.split(path.sep).join('/');
 const expectedSlash = (homes) => resolvePlaceholders(RAW_SLASH, homes.values);
 const expectedInvariants = (homes) => resolvePlaceholders(RAW_INVARIANTS, homes.values);
 const expectedStyle = (homes) => resolvePlaceholders(RAW_STYLE, homes.values);
+const expectedCodexSkill = (homes) => resolvePlaceholders(RAW_CODEX_SKILL, {
+  ...homes.values,
+  INVOCATION_INPUT: 'the complete user request that activated this skill',
+});
+const expectedCodexPrompt = (homes) => codexPrompt(resolvePlaceholders(RAW_CODEX_SKILL, {
+  ...homes.values,
+  INVOCATION_INPUT: '`$ARGUMENTS` supplied to `/prompts:mavis`',
+}));
 
 // Tripwire: the real homes, snapshotted before any subprocess runs, asserted unchanged at the
 // end. If an env override ever stops being honoured, this is what catches it.
@@ -425,6 +476,7 @@ const REAL_TARGETS = [
   path.join(os.homedir(), '.claude', 'output-styles', 'mavis-terse.md'),
   path.join(os.homedir(), '.codex', 'AGENTS.md'),
   path.join(os.homedir(), '.codex', 'prompts', 'mavis.md'),
+  path.join(os.homedir(), '.agents', 'skills', 'mavis', 'SKILL.md'),
   path.join(os.homedir(), '.codex', 'config.toml'),
 ];
 
@@ -452,6 +504,9 @@ function tempHomes(label, t, opts = {}) {
     opts.invariants === undefined ? RAW_INVARIANTS : opts.invariants, 'utf8');
   fs.writeFileSync(path.join(brain, 'mavis', 'slash-mavis.md'),
     opts.slash === undefined ? RAW_SLASH : opts.slash, 'utf8');
+  fs.mkdirSync(path.join(brain, 'mavis', 'codex-skill'), { recursive: true });
+  fs.writeFileSync(path.join(brain, 'mavis', 'codex-skill', 'SKILL.md'),
+    opts.codexSkill === undefined ? RAW_CODEX_SKILL : opts.codexSkill, 'utf8');
   fs.writeFileSync(path.join(brain, 'mavis', 'output-style-terse.md'),
     opts.outputStyle === undefined ? RAW_STYLE : opts.outputStyle, 'utf8');
   if (opts.profile !== null) {
@@ -466,6 +521,7 @@ function tempHomes(label, t, opts = {}) {
     brain,
     claudeHome: path.join(dir, '.claude'),
     codexHome: path.join(dir, '.codex'),
+    agentsHome: path.join(dir, '.agents'),
     // What the CLI will substitute for {{...}} given this fixture.
     values: { USER_NAME: FIXTURE_NAME, BRAIN_ROOT: toPosix(brain) },
   };
@@ -473,6 +529,7 @@ function tempHomes(label, t, opts = {}) {
   assert.ok(homes.dir.startsWith(fs.realpathSync(os.tmpdir())), homes.dir);
   assert.ok(!homes.claudeHome.startsWith(path.join(os.homedir(), '.claude')));
   assert.ok(!homes.codexHome.startsWith(path.join(os.homedir(), '.codex')));
+  assert.ok(!homes.agentsHome.startsWith(path.join(os.homedir(), '.agents')));
   if (t) t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   return homes;
 }
@@ -484,6 +541,7 @@ function runCli(homes, args, extraEnv = {}) {
       ...process.env,
       CLAUDE_CONFIG_DIR: homes.claudeHome,
       CODEX_HOME: homes.codexHome,
+      MAVIS_AGENTS_HOME: homes.agentsHome,
       // Install from the fixture brain, not this repo, so the suite does not depend on the
       // gitignored identity/ dir and never writes the real user's name into a fixture.
       MAVIS_BRAIN_ROOT: homes.brain,
@@ -584,11 +642,13 @@ test('write path: a whole-file target is backed up before it is replaced', (t) =
   assert.equal(read(target), expectedSlash(homes));
 });
 
-test('write path: codex home gets AGENTS.md plus a prompts/ dir it had to create', (t) => {
+test('write path: Codex gets AGENTS.md, the native skill, and the compatibility prompt', (t) => {
   const homes = tempHomes('codex', t);
   const agents = path.join(homes.codexHome, 'AGENTS.md');
   const prompt = path.join(homes.codexHome, 'prompts', 'mavis.md');
+  const skill = path.join(homes.agentsHome, 'skills', 'mavis', 'SKILL.md');
   assert.equal(fs.existsSync(path.dirname(prompt)), false);
+  assert.equal(fs.existsSync(path.dirname(skill)), false);
 
   const r = runCli(homes, ['--harness', 'codex', '--global', '--yes']);
   assert.equal(r.status, 0, r.out);
@@ -597,7 +657,19 @@ test('write path: codex home gets AGENTS.md plus a prompts/ dir it had to create
   const text = read(prompt);
   assert.ok(text.startsWith('---\n'));
   assert.ok(text.includes('argument-hint:'));
-  assert.ok(text.includes('Activate Mavis'));
+  assert.ok(text.includes('$ARGUMENTS'));
+  assert.ok(text.includes(`${toPosix(homes.brain)}/AGENTS.md`));
+  assert.equal(text, `${expectedCodexPrompt(homes).replace(/\n+$/, '')}\n`);
+
+  const skillText = read(skill);
+  const meta = parseFrontmatter(skillText);
+  assert.deepEqual(Object.keys(meta.fields).sort(), ['description', 'name']);
+  assert.equal(meta.fields.name, 'mavis');
+  assert.ok(meta.fields.description.includes('mavis sample-project'));
+  assert.ok(skillText.includes('the complete user request that activated this skill'));
+  assert.ok(skillText.includes(`${toPosix(homes.brain)}/projects/_index.md`));
+  assert.ok(skillText.includes('Prefer a matching explicit project over current-directory detection.'));
+  assert.equal(skillText, `${expectedCodexSkill(homes).replace(/\n+$/, '')}\n`);
   // config.toml is printed, never written.
   assert.equal(fs.existsSync(path.join(homes.codexHome, 'config.toml')), false);
   assert.ok(r.out.includes('commit_attribution = ""'));
@@ -669,6 +741,7 @@ test('write path: the installed copy is personalized and carries no placeholder'
     path.join(homes.claudeHome, 'commands', 'mavis.md'),
     path.join(homes.codexHome, 'AGENTS.md'),
     path.join(homes.codexHome, 'prompts', 'mavis.md'),
+    path.join(homes.agentsHome, 'skills', 'mavis', 'SKILL.md'),
   ];
   for (const f of written) {
     const text = read(f);
@@ -690,6 +763,7 @@ test('write path: resolution is idempotent - a second run rewrites nothing', (t)
   const first = [
     read(path.join(homes.claudeHome, 'CLAUDE.md')),
     read(path.join(homes.codexHome, 'AGENTS.md')),
+    read(path.join(homes.agentsHome, 'skills', 'mavis', 'SKILL.md')),
   ];
 
   const second = runCli(homes, ['--harness', 'both', '--global', '--yes']);
@@ -697,6 +771,7 @@ test('write path: resolution is idempotent - a second run rewrites nothing', (t)
   assert.equal(second.out.includes('WROTE:'), false, second.out);
   assert.equal(read(path.join(homes.claudeHome, 'CLAUDE.md')), first[0]);
   assert.equal(read(path.join(homes.codexHome, 'AGENTS.md')), first[1]);
+  assert.equal(read(path.join(homes.agentsHome, 'skills', 'mavis', 'SKILL.md')), first[2]);
 });
 
 test('write path: the WHOLE-FILE targets are resolved, not just the spliced one', (t) => {
@@ -705,27 +780,44 @@ test('write path: the WHOLE-FILE targets are resolved, not just the spliced one'
   assert.equal(r.status, 0, r.out);
 
   const claudeCmd = path.join(homes.claudeHome, 'commands', 'mavis.md');
-  const codexPrompt = path.join(homes.codexHome, 'prompts', 'mavis.md');
+  const codexPromptFile = path.join(homes.codexHome, 'prompts', 'mavis.md');
+  const codexSkillFile = path.join(homes.agentsHome, 'skills', 'mavis', 'SKILL.md');
   // The spliced targets are deliberately not in this run, so nothing else could be doing it.
   assert.equal(fs.existsSync(path.join(homes.claudeHome, 'CLAUDE.md')), false);
   assert.equal(fs.existsSync(path.join(homes.codexHome, 'AGENTS.md')), false);
 
   const root = toPosix(homes.brain);
-  for (const f of [claudeCmd, codexPrompt]) {
+  for (const f of [claudeCmd, codexPromptFile, codexSkillFile]) {
     const text = read(f);
     assert.equal(text.includes('{{'), false, `placeholder survived into ${f}`);
     assert.equal(text.includes('}}'), false, `placeholder survived into ${f}`);
-    assert.ok(text.includes(`${root}/CLAUDE.md`), `brain root missing from ${f}`);
-    assert.ok(text.includes(`${root}/identity/profile.md`), `brain root missing from ${f}`);
-    assert.ok(text.includes(`${FIXTURE_NAME}'s persistent project collaborator`), f);
     // Absolute, so /mavis cannot point a session at the wrong brain.
     assert.ok(/[A-Za-z]:\//.test(root) || root.startsWith('/'), root);
   }
+  assert.ok(read(claudeCmd).includes(`${root}/CLAUDE.md`));
+  assert.ok(read(claudeCmd).includes(`${root}/identity/profile.md`));
+  assert.ok(read(claudeCmd).includes(`${FIXTURE_NAME}'s persistent project collaborator`));
+  for (const f of [codexPromptFile, codexSkillFile]) {
+    const text = read(f);
+    assert.ok(text.includes(`${root}/AGENTS.md`), `Codex contract missing from ${f}`);
+    assert.ok(text.includes(`${root}/projects/_index.md`), `project router missing from ${f}`);
+    assert.equal(text.includes('CLAUDE.md'), false, `Claude contract leaked into ${f}`);
+  }
   // The Codex copy carries its own frontmatter, and the description inherits the resolved root.
-  const codexText = read(codexPrompt);
+  const codexText = read(codexPromptFile);
   assert.ok(codexText.startsWith('---\n'));
   assert.ok(codexText.includes('argument-hint:'));
-  assert.ok(codexText.includes(`from the brain at ${root}.`), codexText.slice(0, 400));
+  assert.ok(codexText.includes('$ARGUMENTS'));
+});
+
+test('Codex dry run creates neither the native skill nor the compatibility prompt', (t) => {
+  const homes = tempHomes('codex-dryrun', t);
+  const r = runCli(homes, ['--harness', 'codex', '--global']);
+  assert.equal(r.status, 0, r.out);
+  assert.ok(r.out.includes('Files written:     0 (dry run)'), r.out);
+  assert.equal(fs.existsSync(path.join(homes.codexHome, 'AGENTS.md')), false);
+  assert.equal(fs.existsSync(path.join(homes.codexHome, 'prompts', 'mavis.md')), false);
+  assert.equal(fs.existsSync(path.join(homes.agentsHome, 'skills', 'mavis', 'SKILL.md')), false);
 });
 
 test('fails and writes nothing when identity/profile.md is missing', (t) => {
@@ -762,6 +854,7 @@ test('the missing-name failure covers the whole-file targets too', (t) => {
   assert.ok(r.out.includes('Nothing was written'), r.out);
   assert.equal(fs.existsSync(path.join(homes.claudeHome, 'commands', 'mavis.md')), false);
   assert.equal(fs.existsSync(path.join(homes.codexHome, 'prompts', 'mavis.md')), false);
+  assert.equal(fs.existsSync(path.join(homes.agentsHome, 'skills', 'mavis', 'SKILL.md')), false);
   assert.equal(fs.existsSync(path.join(homes.codexHome, 'prompts')), false);
 });
 
@@ -774,6 +867,18 @@ test('an unresolved placeholder in the /mavis source stops the install', (t) => 
   assert.notEqual(r.status, 0, `expected failure, got ${r.status}\n${r.out}`);
   assert.ok(r.out.includes('MACHINE_ID'), r.out);
   assert.equal(fs.existsSync(path.join(homes.claudeHome, 'commands', 'mavis.md')), false);
+});
+
+test('an unresolved placeholder in the Codex skill source stops every Codex target', (t) => {
+  const homes = tempHomes('bad-codex-skill', t, {
+    codexSkill: '---\nname: mavis\ndescription: test\n---\n\nRead {{BRAIN_ROOT}}/AGENTS.md on {{MACHINE_ID}}.\n',
+  });
+  const r = runCli(homes, ['--harness', 'codex', '--global', '--yes']);
+  assert.notEqual(r.status, 0, r.out);
+  assert.ok(r.out.includes('MACHINE_ID'), r.out);
+  assert.equal(fs.existsSync(path.join(homes.codexHome, 'AGENTS.md')), false);
+  assert.equal(fs.existsSync(path.join(homes.codexHome, 'prompts', 'mavis.md')), false);
+  assert.equal(fs.existsSync(path.join(homes.agentsHome, 'skills', 'mavis', 'SKILL.md')), false);
 });
 
 test('fails and writes nothing when the payload holds an unknown placeholder', (t) => {

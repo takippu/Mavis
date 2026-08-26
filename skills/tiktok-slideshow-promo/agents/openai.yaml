@@ -1,0 +1,4 @@
+interface:
+  display_name: "TikTok Slideshow Promo"
+  short_description: "Build story-driven slideshow promo campaigns"
+  default_prompt: "Use $tiktok-slideshow-promo to create a cross-platform slideshow promo campaign."

@@ -138,6 +138,21 @@ test('idForToken resolves a live token, null for an unknown token, null for a sh
   assert.strictEqual(sm.idForToken(sm.tokenFor(shell.id)), null, 'shell pane → null');
 });
 
+test('info() exposes scoped transcript context and setTranscriptMeta enriches it', () => {
+  const sm = new SessionManager({ spawn: () => ({ ok: true, term: fakeTerm() }) });
+  const r = sm.create({ cwd: 'C:/p', harness: 'codex' });
+  const before = sm.info(r.id);
+  assert.strictEqual(before.cwd, 'C:/p');
+  assert.strictEqual(before.harness, 'codex');
+  assert.ok(Number.isFinite(before.startedAt));
+  assert.strictEqual(before.sessionId, null);
+  sm.setTranscriptMeta(r.id, { sessionId: 'thread-1', transcriptPath: 'C:/candidate.jsonl' });
+  const after = sm.info(r.id);
+  assert.strictEqual(after.sessionId, 'thread-1');
+  assert.strictEqual(after.transcriptPath, 'C:/candidate.jsonl');
+  assert.strictEqual(sm.info('missing'), null);
+});
+
 test('close(id) removes that session\'s sidecar files', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mt-session-manager-'));
   const prevUserData = process.env.MAVIS_USER_DATA;

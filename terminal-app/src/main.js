@@ -26,6 +26,7 @@ const vizBuild = require('./viz-build');
 const vizServer = require('./viz-server');
 const toastWindow = require('./toast-window');
 const sessionEvents = require('./session-events');
+const transcriptCommands = require('./transcript-commands');
 
 let win = null;
 let sessions = null;
@@ -241,9 +242,12 @@ app.whenReady().then(() => {
   // silently dropped rather than pushed — the renderer has nothing to attach it to.
   sessionReader = sessionEvents.createReader({
     userDataDir,
-    onState: ({ token, state }) => {
+    onState: ({ token, state, sessionId, transcriptPath }) => {
       const id = sessions.idForToken(token);
-      if (id) send('session:state', { id, state });
+      if (id) {
+        sessions.setTranscriptMeta(id, { sessionId, transcriptPath });
+        send('session:state', { id, state });
+      }
     },
   });
   sessionReader.start();
@@ -340,6 +344,17 @@ ipcMain.on('close-session', (_e, msg) => { if (msg && typeof msg === 'object') s
 // per-session picker, and the tab badge all filter against (see src/harness/index.js available()).
 ipcMain.handle('harness:available', async () => {
   try { return harnessRegistry.available(); } catch { return ['claude']; }
+});
+// Renderer supplies only a live PTY id. Main resolves its trusted cwd/harness/session metadata and
+// the transcript reader derives + validates every path under ~/.claude/projects or ~/.codex/sessions.
+ipcMain.handle('session:commands', async (_e, id) => {
+  try {
+    const info = sessions && sessions.info(id);
+    if (!info || info.kind !== 'mavis') return { ok: false, blocks: [], reason: 'unknown-session' };
+    return transcriptCommands.listSuggestedCommands(info);
+  } catch (e) {
+    return { ok: false, blocks: [], reason: e && e.message ? e.message : 'command-read-failed' };
+  }
 });
 
 // ---- data ----
@@ -725,6 +740,16 @@ ipcMain.handle('files:parent', async (_e, payload) => {
   ascendedFileRoots.add(normPath(parent));
   return { root: parent };
 });
+ipcMain.handle('files:open-root', async (_e, payload) => {
+  const p = payload && typeof payload === 'object' ? payload : {};
+  try {
+    const approved = fsBrowser.resolveBrowsableRoot(filesCeiling(), p.path);
+    ascendedFileRoots.add(normPath(approved));
+    return { root: approved };
+  } catch (e) {
+    return { error: e && e.message ? e.message : String(e) };
+  }
+});
 ipcMain.handle('files:list', async (_e, payload) => {
   const p = payload && typeof payload === 'object' ? payload : {};
   const root = filesRootOrAscended(p.root);
@@ -737,6 +762,13 @@ ipcMain.handle('files:read', async (_e, payload) => {
   const root = filesRootOrAscended(p.root);
   if (!root) return { error: 'EROOT: root is not a trusted path' };
   try { return await fsBrowser.readFile(root, p.rel); }
+  catch (e) { return { error: e && e.message ? e.message : String(e) }; }
+});
+ipcMain.handle('files:search', async (_e, payload) => {
+  const p = payload && typeof payload === 'object' ? payload : {};
+  const root = filesRootOrAscended(p.root);
+  if (!root) return { error: 'EROOT: root is not a trusted path' };
+  try { return await fsBrowser.searchFiles(root, p.query, { mode: p.mode }); }
   catch (e) { return { error: e && e.message ? e.message : String(e) }; }
 });
 ipcMain.handle('files:write', async (_e, payload) => {
@@ -783,6 +815,7 @@ const gitCall = (fn) => async (_e, payload) => {
 
 ipcMain.handle('git:status', gitCall((root) => gitRepo.status(root)));
 ipcMain.handle('git:diff', gitCall((root, p) => gitRepo.diffFile(root, p.rel, !!p.staged)));
+ipcMain.handle('git:search', gitCall((root, p) => gitRepo.searchChanges(root, p.query, p.mode)));
 ipcMain.handle('git:stage', gitCall((root, p) => gitRepo.stage(root, p.rels)));
 ipcMain.handle('git:unstage', gitCall((root, p) => gitRepo.unstage(root, p.rels)));
 ipcMain.handle('git:discard', gitCall((root, p) => gitRepo.discard(root, p.rels)));

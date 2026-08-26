@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Install Mavis into a harness home: the global invariants (spliced between markers so any
-// non-Mavis content in the file survives) and the /mavis prompt.
+// non-Mavis content in the file survives), Claude's /mavis command, and Codex's native
+// Mavis skill plus deprecated compatibility prompt.
 //
 // SAFETY. Every target is OUTSIDE this repo - they are the user's live harness config.
 // Therefore:
@@ -54,7 +55,8 @@ Options:
 
 Sources (edit these, then re-run):
   mavis/global-invariants.md   the --global payload
-  mavis/slash-mavis.md         the /mavis prompt
+  mavis/slash-mavis.md         the Claude /mavis command
+  mavis/codex-skill/SKILL.md   the native Codex skill and compatibility-prompt source
   mavis/output-style-terse.md  the mavis-terse output style (Claude only)
 
 All are portable: {{USER_NAME}} and {{BRAIN_ROOT}} are resolved at write time from
@@ -64,6 +66,7 @@ the installed copy is personal.
 Environment:
   CLAUDE_CONFIG_DIR  override ~/.claude
   CODEX_HOME         override ~/.codex
+  MAVIS_AGENTS_HOME  override ~/.agents (native Codex skill root; useful for tests)
   MAVIS_BRAIN_ROOT   install the sources from another brain clone instead of this one
   MAVIS_INSTALL_ASSUME_HARNESSES
                      comma list ("claude,codex") that replaces the PATH probe. Exists so
@@ -414,6 +417,8 @@ function main(argv) {
   // second run produces identical bytes.
   let invariants;
   let slash;
+  let codexSkill;
+  let codexPromptSource;
   let outputStyle;
   let userName;
   try {
@@ -421,6 +426,15 @@ function main(argv) {
     const values = { USER_NAME: userName, BRAIN_ROOT: posix(BRAIN_ROOT) };
     invariants = resolvePlaceholders(readSource(path.join('mavis', 'global-invariants.md')), values);
     slash = resolvePlaceholders(readSource(path.join('mavis', 'slash-mavis.md')), values);
+    const rawCodexSkill = readSource(path.join('mavis', 'codex-skill', 'SKILL.md'));
+    codexSkill = resolvePlaceholders(rawCodexSkill, {
+      ...values,
+      INVOCATION_INPUT: 'the complete user request that activated this skill',
+    });
+    codexPromptSource = resolvePlaceholders(rawCodexSkill, {
+      ...values,
+      INVOCATION_INPUT: '`$ARGUMENTS` supplied to `/prompts:mavis`',
+    });
     outputStyle = resolvePlaceholders(readSource(path.join('mavis', 'output-style-terse.md')), values);
   } catch (err) {
     console.error(`\nERROR: ${err.message}`);
@@ -432,8 +446,11 @@ function main(argv) {
   const homes = {
     claudeHome: process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude'),
     codexHome: process.env.CODEX_HOME || path.join(os.homedir(), '.codex'),
+    agentsHome: process.env.MAVIS_AGENTS_HOME || path.join(os.homedir(), '.agents'),
     invariants,
     slash,
+    codexSkill,
+    codexPromptSource,
     outputStyle,
   };
 
