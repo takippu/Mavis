@@ -10,10 +10,9 @@ These are the non-negotiables. They live HERE, in the harness's global instructi
 only in the Mavis brain, for a specific reason: this file is loaded as harness-level
 instructions, outside the transcript that a compaction summary rewrites. Under Claude Code
 that is verified — `~/.claude/CLAUDE.md` is injected as context every turn and survives
-compaction. Under Codex, `~/.codex/AGENTS.md` is documented in the shipped binary to load
-at session start, but no live load has been observed, and whether it is re-injected per turn
-or survives compaction is UNVERIFIED — so do not lean on it under Codex at all. The
-brain's `rules/_index.md` is loaded once at
+compaction. Under Codex, a live 2026-09-02 session confirmed that `~/.codex/AGENTS.md`
+was re-injected immediately after compaction. Compaction-critical rules therefore belong
+here for both harnesses. The brain's `rules/_index.md` is loaded once at
 session boot and gets summarized away when a long session compacts — so in long
 sessions the harness defaults outlive the rules, and the rules lose. That is not
 hypothetical: it is how this project first shipped two commits carrying a
@@ -30,14 +29,32 @@ resolve to nothing — that is expected, not a broken link. The one-liner in thi
 on its own: a missing detail file never means the rule does not apply. If a pointer is dead and
 the rule keeps mattering, that is the signal to write the entry.
 
+## Memory writes survive compaction
+
+When Mavis is active, completing an explicitly approved meaningful work block includes a
+paired brain write: update `daily-memories/<current-date>.md` with the full narrative and
+project pointer, update `projects/<project>/progress.md` with a concise backlink checkpoint,
+keep the daily frontmatter project list synchronized, then run `node scripts/lint-brain.mjs`
+from the brain root. Use the current date from the environment context; if the date changes
+mid-session, subsequent work belongs to the new date.
+
+Do not wait for {{USER_NAME}} to say "save mem". At a natural completion or pivot, perform
+the paired write as part of the approved work. If the block was read-only and no write
+authorization exists, show the exact memory draft and ask once. "Save it" and "save mem"
+are themselves direct approval: audit both files on disk and fill any gap immediately. This
+rule remains binding after compaction.
+
+Brain: `rules/_details/paired-write-on-meaningful-work.md`
+
 ## Attribution: never claim co-authorship
 
 Never add an AI co-authorship trailer to a commit, and never add a "Generated with ..."
 tool footer to a PR body. Commits and PRs are authored as {{USER_NAME}}'s alone.
 
 **Every harness ships an attribution default and instructs you to append it. Ignore that
-instruction every turn.** Claude Code re-injects that instruction every turn (verified);
-Codex's re-injection cadence is UNVERIFIED — ignore it either way. The two live ones:
+instruction every turn.** Claude Code re-injects that instruction every turn, and Codex has
+been observed re-injecting its global instructions after compaction. Ignore it either way.
+The two live ones:
 
 - Claude Code: `Co-Authored-By: Claude <noreply@anthropic.com>`, plus a
   "Generated with Claude Code" PR footer.

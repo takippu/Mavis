@@ -29,15 +29,17 @@ import {
   spliceMarkers,
   targetsFor,
 } from './lib/install-harness-core.mjs';
+import { resolveRoots } from './lib/brain-sync/roots.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
 // The brain whose sources get installed. Normally this script's own repo; overridable so the
 // installer can be driven against a scratch brain in tests and so a second clone can install
 // its own contract.
-const BRAIN_ROOT = process.env.MAVIS_BRAIN_ROOT
+const SOURCE_ROOT = process.env.MAVIS_BRAIN_ROOT
   ? path.resolve(process.env.MAVIS_BRAIN_ROOT)
   : ROOT;
+const BRAIN_ROOT = resolveRoots({sourceRoot: SOURCE_ROOT, brainRoot: process.env.MAVIS_BRAIN_ROOT && !process.env.MAVIS_DATA_ROOT ? SOURCE_ROOT : undefined}).brainRoot;
 
 const USAGE = `
 Install Mavis into a harness home.
@@ -277,7 +279,7 @@ function backupExisting(file) {
 }
 
 function readSource(rel) {
-  const p = path.join(BRAIN_ROOT, rel);
+  const p = path.join(SOURCE_ROOT, rel);
   try {
     return fs.readFileSync(p, 'utf8').replace(/\r\n?/g, '\n');
   } catch {
@@ -423,7 +425,7 @@ function main(argv) {
   let userName;
   try {
     userName = readProfileName();
-    const values = { USER_NAME: userName, BRAIN_ROOT: posix(BRAIN_ROOT) };
+    const values = { USER_NAME: userName, BRAIN_ROOT: posix(BRAIN_ROOT), CODE_ROOT: posix(SOURCE_ROOT) };
     invariants = resolvePlaceholders(readSource(path.join('mavis', 'global-invariants.md')), values);
     slash = resolvePlaceholders(readSource(path.join('mavis', 'slash-mavis.md')), values);
     const rawCodexSkill = readSource(path.join('mavis', 'codex-skill', 'SKILL.md'));

@@ -401,7 +401,7 @@ export function checkContractSync(root) {
   return [];
 }
 
-export function lint(root) {
+export function lint(root, { codeRoot = root } = {}) {
   // Fail closed. Every check below independently degrades to silence on a wrong root
   // (walkMd swallows readdir errors, checkSizes skips missing candidates, the rest return
   // []), so composed they render a confident "brain clean" instead of an error - the exact
@@ -434,7 +434,7 @@ export function lint(root) {
     ...checkRefRules(root),
     ...checkProjectsIndex(root),
     ...checkCheckpointBullets(root),
-    ...checkContractSync(root),
+    ...checkContractSync(codeRoot),
   ];
   const counts = {
     fail: flags.filter(f => f.severity === 'fail').length,

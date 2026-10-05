@@ -354,7 +354,7 @@ test('the committed Codex skill has valid trigger metadata and portable activati
   assert.ok(parsed.fields.description.includes('mavis sample-project'));
   assert.ok(parsed.fields.description.includes('$mavis'));
   assert.ok(parsed.fields.description.includes('resume sample-project with mavis'));
-  assert.ok(RAW_CODEX_SKILL.includes('{{BRAIN_ROOT}}/AGENTS.md'));
+  assert.ok(RAW_CODEX_SKILL.includes('{{CODE_ROOT}}/AGENTS.md'));
   assert.ok(RAW_CODEX_SKILL.includes('{{INVOCATION_INPUT}}'));
   assert.equal(/CLAUDE\.md|topic_index\.md|Steps? 0.?7/i.test(RAW_CODEX_SKILL), false);
   assert.equal(/[A-Za-z]:[\\/]Users[\\/]/.test(RAW_CODEX_SKILL), false);

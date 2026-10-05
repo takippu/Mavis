@@ -12,11 +12,13 @@ test('ptyCommand wraps the .cmd shim exactly like claude does', () => {
   const c = codex.ptyCommand({ binPath: 'C:/npm/codex.cmd', permissionMode: 'default' });
   assert.match(c.file, /cmd\.exe$/i);
   assert.deepStrictEqual(c.args.slice(0, 2), ['/c', 'C:/npm/codex.cmd']);
+  assert.strictEqual(c.args[2], '--no-daemon');
 });
 
 test('ptyCommand runs a real .exe directly', () => {
   const c = codex.ptyCommand({ binPath: 'C:/tools/codex.exe', permissionMode: 'default' });
   assert.strictEqual(c.file, 'C:/tools/codex.exe');
+  assert.strictEqual(c.args[0], '--no-daemon');
 });
 
 test('resolveBin selects .cmd shim from where codex output (Windows preference)', () => {
@@ -77,7 +79,7 @@ test('headlessCommand reuses the non-interactive read-only plan mapping', () => 
   const h = codex.headlessCommand({ binPath: 'c.exe', permissionMode: 'plan' });
   const p = codex.ptyCommand({ binPath: 'c.exe', permissionMode: 'plan' });
   assert.deepStrictEqual(h, p, 'headlessCommand delegates straight to ptyCommand, no divergence');
-  assert.deepStrictEqual(h.args, ['--sandbox', 'read-only', '--ask-for-approval', 'never']);
+  assert.deepStrictEqual(h.args, ['--no-daemon', '--sandbox', 'read-only', '--ask-for-approval', 'never']);
 });
 
 test('headlessArgs passes the prompt as a positional arg, not stdin', () => {

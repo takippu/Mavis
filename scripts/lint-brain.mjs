@@ -5,16 +5,20 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { lint } from './lib/brain-lint-core.mjs';
+import { resolveRoots } from './lib/brain-sync/roots.mjs';
 
 // Self-locate, exactly like the sibling scripts/lint-index.mjs. Resolving from
 // process.cwd() made every check degrade to silence when invoked from anywhere else
 // (`cd scripts && node lint-brain.mjs` printed "brain clean: no flags" and exited 0 while
 // the brain root reported 30 fails) - a rot detector that fails open is worse than none.
-const brainRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+const args = process.argv.slice(2);
+const rootIndex = Math.max(args.indexOf('--brain-root'), args.indexOf('--root'));
+const roots = resolveRoots({ brainRoot: rootIndex < 0 ? undefined : args[rootIndex + 1] });
+const brainRoot = roots.brainRoot;
 
 let report;
 try {
-  report = lint(brainRoot);
+  report = lint(brainRoot, { codeRoot: roots.codeRoot });
 } catch (e) {
   console.error(`lint-brain: ${e.message}`);
   process.exit(2);

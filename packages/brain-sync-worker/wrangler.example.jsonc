@@ -1,0 +1,10 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "mavis-brain-sync",
+  "main": "src/index.mjs",
+  "compatibility_date": "2026-10-05",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true, "head_sampling_rate": 0.1 },
+  "d1_databases": [{ "binding": "DB", "database_name": "mavis-brain-sync", "database_id": "REPLACE_WITH_YOUR_D1_ID", "migrations_dir": "migrations" }],
+  "r2_buckets": [{ "binding": "BLOBS", "bucket_name": "mavis-brain-sync-private" }]
+}

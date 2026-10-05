@@ -30,6 +30,8 @@ function tmpBrain(files) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mt-health-'));
   fs.mkdirSync(path.join(root, 'scripts', 'lib'), { recursive: true });
   fs.copyFileSync(path.join(BRAIN_SCRIPTS, 'lint-brain.mjs'), path.join(root, 'scripts', 'lint-brain.mjs'));
+  fs.mkdirSync(path.join(root, 'scripts/lib/brain-sync'), {recursive:true});
+  for (const name of ['roots.mjs','roots.cjs']) fs.copyFileSync(path.join(BRAIN_SCRIPTS,'lib/brain-sync',name),path.join(root,'scripts/lib/brain-sync',name));
   fs.copyFileSync(
     path.join(BRAIN_SCRIPTS, 'lib', 'brain-lint-core.mjs'),
     path.join(root, 'scripts', 'lib', 'brain-lint-core.mjs')

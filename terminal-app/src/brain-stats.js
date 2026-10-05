@@ -136,9 +136,14 @@ function safeSlug(slug) {
 function readProjectMeta(brainRoot, slug) {
   if (!safeSlug(slug)) return {};
   try {
-    return parseFrontmatter(
+    const metadata = parseFrontmatter(
       fs.readFileSync(path.join(brainRoot, 'projects', slug, 'index.md'), 'utf8')
     );
+    const roots=require('./brain-roots')(brainRoot);
+    if(roots.config.brainRoot===brainRoot) {
+      try {const overrides=JSON.parse(fs.readFileSync(path.join(roots.machineRoot,'projects.json'),'utf8'));return {...metadata,...(overrides[slug]||{})};} catch(error) {if(error.code!=='ENOENT')throw error;}
+    }
+    return metadata;
   } catch {
     return {};
   }
@@ -706,9 +711,11 @@ function mavisFilePath(brainRoot, key) {
 // AGENTS.md is the canonical contract; CLAUDE.md is generated from it by scripts/sync-contract.mjs.
 // A legacy brain predating the split has only CLAUDE.md, which is still valid.
 function contractFiles(brainRoot) {
+  const roots = require('./brain-roots')(brainRoot);
+  const codeRoot = roots.config.brainRoot === brainRoot ? roots.codeRoot : brainRoot;
   const out = [];
   for (const [name, flags] of [['AGENTS.md', { canonical: true }], ['CLAUDE.md', { generated: true }]]) {
-    const p = path.join(brainRoot, name);
+    const p = path.join(fs.existsSync(path.join(brainRoot,name)) ? brainRoot : codeRoot, name);
     try {
       const st = fs.statSync(p);
       out.push({ name, path: p, bytes: st.size, ...flags });
@@ -790,15 +797,17 @@ function listMcpServers(brainRoot, userJsonPath) {
 // skills/<name>/SKILL.md → [{ name, description }], sorted by name. [] when skills/ is absent;
 // dirs without a readable SKILL.md are skipped (a skill mid-authoring never breaks the list).
 function listSkills(brainRoot) {
+  const roots = require('./brain-roots')(brainRoot);
+  const sourceRoot = roots.config.brainRoot === brainRoot ? roots.codeRoot : brainRoot;
   return memo('skills:' + brainRoot, () => {
     let entries;
-    try { entries = fs.readdirSync(path.join(brainRoot, 'skills'), { withFileTypes: true }); }
+    try { entries = fs.readdirSync(path.join(sourceRoot, 'skills'), { withFileTypes: true }); }
     catch { return []; } // no skills/ dir → legacy-safe empty
     const out = [];
     for (const e of entries) {
       if (!e.isDirectory() || !safeSlug(e.name)) continue;
       let md;
-      try { md = fs.readFileSync(path.join(brainRoot, 'skills', e.name, 'SKILL.md'), 'utf8'); }
+      try { md = fs.readFileSync(path.join(sourceRoot, 'skills', e.name, 'SKILL.md'), 'utf8'); }
       catch { continue; } // dir without a readable SKILL.md → skip
       const s = parseSkillMd(md, e.name);
       out.push({ name: s.name, description: s.description });

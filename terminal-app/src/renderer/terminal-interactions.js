@@ -26,6 +26,15 @@
     return true;
   }
 
-  return { createOscLinkHandler, handlePlainSpace };
-});
+  function handleCodexAltArrow(event, send) {
+    if (!event || event.type !== 'keydown' || !event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return false;
+    const arrow = { ArrowUp: 'A', ArrowDown: 'B', ArrowRight: 'C', ArrowLeft: 'D' }[event.key];
+    if (!arrow || typeof arrow !== 'string') return false;
+    // xterm maps plain Alt+arrow to Ctrl+arrow on Windows. Codex binds the actual Alt key.
+    event.preventDefault();
+    send('\x1b[1;3' + arrow);
+    return true;
+  }
 
+  return { createOscLinkHandler, handlePlainSpace, handleCodexAltArrow };
+});

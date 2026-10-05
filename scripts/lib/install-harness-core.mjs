@@ -144,6 +144,8 @@ export function detectHarnesses(opts = {}) {
 export const PLACEHOLDER_RE = /\{\{\s*([A-Za-z0-9_]+)\s*\}\}/g;
 
 export function resolvePlaceholders(text, values = {}) {
+  // Legacy callers describe a colocated brain with BRAIN_ROOT alone.
+  values = { CODE_ROOT: values.BRAIN_ROOT, ...values };
   const src = String(text == null ? '' : text).replace(/\r\n?/g, '\n');
   const missing = new Set();
   const out = src.replace(PLACEHOLDER_RE, (whole, key) => {

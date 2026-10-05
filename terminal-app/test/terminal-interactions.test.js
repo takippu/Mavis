@@ -29,3 +29,32 @@ test('modified Space and non-keydown events stay with xterm', () => {
   assert.strictEqual(interactions.handlePlainSpace({ type: 'keydown', key: 'a' }, send), false);
 });
 
+test('Codex Alt+arrow sends Alt cursor sequences instead of xterm Windows Ctrl sequences', () => {
+  const cases = [
+    ['ArrowUp', '\x1b[1;3A'],
+    ['ArrowDown', '\x1b[1;3B'],
+    ['ArrowRight', '\x1b[1;3C'],
+    ['ArrowLeft', '\x1b[1;3D'],
+  ];
+  for (const [key, sequence] of cases) {
+    const sent = [];
+    let prevented = 0;
+    const event = { type: 'keydown', key, altKey: true, preventDefault() { prevented++; } };
+    assert.strictEqual(interactions.handleCodexAltArrow(event, (data) => sent.push(data)), true);
+    assert.deepStrictEqual(sent, [sequence]);
+    assert.strictEqual(prevented, 1);
+  }
+});
+
+test('Codex Alt+arrow handler leaves other key combinations to xterm', () => {
+  const send = () => { throw new Error('must not send'); };
+  const cases = [
+    { type: 'keydown', key: 'ArrowUp' },
+    { type: 'keydown', key: 'ArrowUp', altKey: true, ctrlKey: true },
+    { type: 'keydown', key: 'ArrowUp', altKey: true, shiftKey: true },
+    { type: 'keydown', key: 'ArrowUp', altKey: true, metaKey: true },
+    { type: 'keyup', key: 'ArrowUp', altKey: true },
+    { type: 'keydown', key: 'Enter', altKey: true },
+  ];
+  for (const event of cases) assert.strictEqual(interactions.handleCodexAltArrow(event, send), false);
+});

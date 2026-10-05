@@ -47,10 +47,12 @@ function spawnOpts(brainRoot, maxBuffer) {
 }
 
 function runLint(brainRoot, opts, cb) {
-  const script = (opts && opts.scriptPath) || path.join(brainRoot, 'scripts', 'lint-brain.mjs');
+  const roots=require('./brain-roots')(brainRoot);
+  if(roots.migrationBlocker && !(opts&&opts.scriptPath))return void cb(new Error(roots.migrationBlocker));
+  const script = (opts && opts.scriptPath) || path.join(require('node:fs').existsSync(path.join(brainRoot,'scripts/lint-brain.mjs')) ? brainRoot : require('./brain-roots')(brainRoot).codeRoot, 'scripts', 'lint-brain.mjs');
   execFile(
     process.execPath,
-    [script, '--json'],
+    [script, '--json', '--brain-root', brainRoot],
     spawnOpts(brainRoot, 8 * 1024 * 1024),
     (err, stdout) => {
       // exit 1 + stdout = FAIL flags present = a real report. Anything else non-zero is an error.
@@ -187,13 +189,14 @@ function runRepair(brainRoot, opts, cb) {
   const bad = validateRepair(brainRoot, o.command, o.project);
   if (bad) return void cb(bad); // reject BEFORE spawning: nothing has run at this point
 
-  const script = o.scriptPath || path.join(brainRoot, 'scripts', 'brain-repair.mjs');
+  const script = o.scriptPath || path.join(require('./brain-roots')(brainRoot).codeRoot, 'scripts', 'brain-repair.mjs');
   const apply = !!o.apply;
   if (apply && (!o.plan || !Array.isArray(o.plan.writes))) {
     return void cb(badRequest('ENOPLAN', 'apply requires the plan returned by a dry-run preview'));
   }
 
   const args = [script, o.command, o.project];
+  args.push(`--brain-root=${brainRoot}`);
   args.push(apply ? '--apply' : '--dry-run', '--json');
   if (apply) args.push('--plan=-');
 

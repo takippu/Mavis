@@ -7,6 +7,7 @@
 const path = require('path');
 const fs = require('fs');
 const harnessRegistry = require('./harness');
+const resolveRoots = require('./brain-roots');
 
 function compute(userDataDir) {
   let file = {};
@@ -23,7 +24,8 @@ function compute(userDataDir) {
     return def;
   };
 
-  const BRAIN_ROOT = pick('brainRoot', 'MAVIS_BRAIN_ROOT', path.resolve(__dirname, '..', '..'));
+  const roots = resolveRoots(pick('brainRoot', 'MAVIS_BRAIN_ROOT', undefined));
+  const BRAIN_ROOT = roots.brainRoot;
   const HARNESS = harnessRegistry.normalizeId(pick('harness', 'MAVIS_HARNESS', 'claude'));
   // Each adapter owns the native command that loads Mavis in ITS OWN CLI (Claude: /mavis,
   // Codex: $mavis). A configured override still wins — but only when it is GENUINELY
@@ -48,6 +50,8 @@ function compute(userDataDir) {
   };
   return {
     BRAIN_ROOT,
+    CODE_ROOT: roots.codeRoot,
+    BRAIN_MIGRATION_BLOCKER: roots.migrationBlocker || null,
     PROJECTS_INDEX: path.join(BRAIN_ROOT, 'projects', '_index.md'),
     PTY_CWD: pick('cwd', 'MAVIS_CWD', BRAIN_ROOT),
     AUTORUN_COMMAND: autorunCommandForHarness(HARNESS),

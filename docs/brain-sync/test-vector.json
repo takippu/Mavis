@@ -1,0 +1,20 @@
+{
+  "warning": "Public synthetic key. Never use in a real vault.",
+  "master": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc",
+  "vault": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+  "plaintext": "Mavis synthetic interoperability vector",
+  "object": {
+    "id": "3C9W7kYIJHZJUcE4NVNsQG5zCi6BTTCtyOjPZEDFsP0",
+    "epoch": 1,
+    "kind": "document",
+    "hash": "23565e67aa802e1c2926c46dbb16b9837cd645f273cebf27ec0fda2149b7cb74",
+    "bytes": 266,
+    "data": "eyJib2R5IjoiNU4yMDQzQUVENFZlR1VRZGY3LWZGY0hfdnNtakFKNHlqV3FlSFRsclNtcEIyVDVWVElrbiIsImVwb2NoIjoxLCJpZCI6IjNDOVc3a1lJSkhaSlVjRTROVk5zUUc1ekNpNkJUVEN0eU9qUFpFREZzUDAiLCJraW5kIjoiZG9jdW1lbnQiLCJub25jZSI6InpSU05pR1BnWDdYSzd1V3ciLCJ0YWciOiJkQmxmTHU0dGpNSUN4T21wcWRVVTZnIiwidmF1bHQiOiJBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBIiwidmVyc2lvbiI6MX0="
+  },
+  "commit": {
+    "version": 1,
+    "vault": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    "generation": 1
+  },
+  "mac": "dcd910a7f19de3d05fa64ccfc3a5a68ff0a078d5bede867f5ca2dbf95d4a3580"
+}

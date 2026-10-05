@@ -13,17 +13,19 @@
 // Either way applyPlan verifies each precondition and refuses a stale plan.
 import fs from 'node:fs';
 import { planRotation, planShard, applyPlan } from './lib/brain-repair-core.mjs';
+import { resolveRoots } from './lib/brain-sync/roots.mjs';
 
 const argv = process.argv.slice(2);
 const flagArgs = argv.filter((a) => a.startsWith('--'));
 const flags = new Set(flagArgs.filter((a) => !a.includes('=')));
 const planOpt = flagArgs.find((a) => a.startsWith('--plan='));
+const rootOpt = flagArgs.find((a) => a.startsWith('--brain-root='));
 const [cmd, project] = argv.filter((a) => !a.startsWith('--'));
 const dry = flags.has('--dry-run');
 const apply = flags.has('--apply');
 const json = flags.has('--json');
 const planFile = planOpt ? planOpt.slice('--plan='.length) : null;
-const root = process.cwd();
+const root = rootOpt ? resolveRoots({brainRoot:rootOpt.slice('--brain-root='.length)}).brainRoot : process.env.MAVIS_DATA_ROOT || resolveRoots().config.brainRoot || process.cwd();
 
 if (!['rotate', 'shard-notes'].includes(cmd) ||
     !/^[a-z0-9][a-z0-9._-]*$/.test(project || '') ||

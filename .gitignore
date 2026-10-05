@@ -72,9 +72,15 @@ google-services.json
 # The packaged terminal-app dropped here by `npm run dist` (terminal-app/scripts/copy-portable.js)
 # so it's one double-click from the brain root. A ~100MB build artifact, never committed.
 /Mavis-Terminal.exe
+/Mavis-Terminal-*.exe
+/.lint-*.log
 
 # Node — unanchored, so terminal-app/ and viz/ are both covered.
 node_modules/
+.wrangler/
+.dev.vars
+wrangler.private.jsonc
+*.enc.json
 
 # Python bytecode. skills/portrait-cutout ships cutout.py, and a tracked .pyc embedded the
 # author's absolute Windows path in its bytecode.

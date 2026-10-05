@@ -64,8 +64,8 @@ function collectSeedFiles(seedDir, targetDir) {
  *   'present' -- _index.md already there, seed skipped (only _details/ is ensured)
  *   'noseed'  -- _index.md absent AND no seed ships for it (caller must fall back to SETUP.md prose)
  */
-export function planInit(brainRoot) {
-  const seedsRoot = path.join(brainRoot, 'seeds');
+export function planInit(brainRoot, codeRoot = brainRoot) {
+  const seedsRoot = path.join(codeRoot, 'seeds');
   const seedsPresent = exists(seedsRoot);
   const categories = [];
   const problems = [];

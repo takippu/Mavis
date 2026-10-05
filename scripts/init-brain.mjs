@@ -10,14 +10,17 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { planInit, applyInit, verifyDetailLinks } from './lib/init-brain-core.mjs';
+import { resolveRoots } from './lib/brain-sync/roots.mjs';
 
 // Self-locate, exactly like sync-contract.mjs and lint-brain.mjs. Resolving from process.cwd()
 // would seed whatever directory the user happened to be standing in.
-const brainRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+const rootIndex = process.argv.indexOf('--brain-root');
+const roots = resolveRoots({ brainRoot: rootIndex < 0 ? undefined : process.argv[rootIndex + 1] });
+const brainRoot = roots.brainRoot;
 const write = process.argv.includes('--write');
 const check = process.argv.includes('--check');
 
-const plan = planInit(brainRoot);
+const plan = planInit(brainRoot, roots.codeRoot);
 
 if (!plan.seedsPresent) {
   console.error('FAIL  seeds/ is missing -- cannot seed.');

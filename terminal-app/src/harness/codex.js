@@ -67,7 +67,9 @@ function ptyCommand({ binPath, hookCommand, permissionMode } = {}) {
       args = ['/c', 'codex'];
     }
   }
-  args = args.concat(hookOverrides(hookCommand)).concat(permissionArgs(permissionMode));
+  // The Windows host can keep Codex in a Job Object that blocks daemon detachment.
+  // Keep Mavis sessions in-process until Codex can start its daemon in that host.
+  args = args.concat('--no-daemon', hookOverrides(hookCommand), permissionArgs(permissionMode));
   return { file, args };
 }
 
