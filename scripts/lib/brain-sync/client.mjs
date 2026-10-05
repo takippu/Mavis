@@ -18,12 +18,18 @@ export class BrainClient {
     this.endpoint = validateEndpoint(config.endpoint); this.root = config.brainRoot;
     if(!/^[A-Za-z0-9_-]{43}$/.test(config.vault||'') || !this.root || !fs.existsSync(this.root) || !fs.lstatSync(this.root).isDirectory() || fs.lstatSync(this.root).isSymbolicLink())throw failure('Invalid vault or data root; recover/configure before sync');
     this.deadline = deadline;
+    this.nextRequestAt = 0;
   }
   key(epoch = 1) { const key = this.secrets.keys?.[String(epoch)]; if (!key) throw failure('Missing epoch key; import protected recovery material',5);if(typeof key!=='string'||!/^[A-Za-z0-9_-]{43}$/.test(key))throw failure('Invalid epoch key',7);return Buffer.from(key,'base64url'); }
   state() { return readJSON(path.join(this.directory,'state.json'), { head:null,generation:0,epoch:1,files:{},tombstones:[] }); }
   checkpoint(value) { writeJSON(path.join(this.directory,'state.json'), value); }
   async request(route, method = 'GET', value, binary = false, attempt = 0) {
     if(!/^[A-Za-z0-9_-]{43}$/.test(this.secrets.credential||''))throw failure('Device credentials missing; privately enroll before remote sync',5);
+    // All parallel downloads share this reservation: at most 300 requests/minute.
+    const scheduled=Math.max(Date.now(),this.nextRequestAt);
+    if(this.deadline && scheduled>=this.deadline)throw failure('Startup sync deadline reached; using local memory',4);
+    this.nextRequestAt=scheduled+200;
+    if(scheduled>Date.now())await new Promise(resolve=>setTimeout(resolve,scheduled-Date.now()));
     let response;
     const timeout=this.deadline?Math.min(30000,this.deadline-Date.now()):30000;
     if(timeout<=0)throw failure('Startup sync deadline reached; using local memory',4);
@@ -31,7 +37,9 @@ export class BrainClient {
     catch { throw failure('Sync endpoint unavailable or timed out; local changes retained',4); }
     if(attempt<2 && [429,500,502,503,504].includes(response.status) && (method==='GET'||method==='PUT'||['/uploads','/commits'].includes(route))) {
       const retryAfter=Number(response.headers.get('Retry-After'));
-      const delay=Number.isFinite(retryAfter)&&retryAfter>0?Math.min(2000,retryAfter*1000):250*2**attempt;
+      const delay=response.status===429
+        ? Math.min(60000,Number.isFinite(retryAfter)&&retryAfter>0?retryAfter*1000:61000-Date.now()%60000)
+        : Number.isFinite(retryAfter)&&retryAfter>0?Math.min(2000,retryAfter*1000):250*2**attempt;
       if(!this.deadline||Date.now()+delay<this.deadline) {
         await response.body?.cancel();await new Promise(resolve=>setTimeout(resolve,delay));
         return this.request(route,method,value,binary,attempt+1);

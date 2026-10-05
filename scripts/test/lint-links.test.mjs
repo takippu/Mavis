@@ -27,6 +27,23 @@ function makeBrain(files) {
   return root;
 }
 
+test('separate brain resolves code documentation and skill links against code root', t => {
+  const root=makeBrain({'topics/example.md':'[guide](../docs/guide.md#overview)\n[skill](../skills/example/SKILL.md)'});
+  const code=makeBrain({'docs/guide.md':'# Overview','skills/example/SKILL.md':'# Example'});
+  t.after(()=>{fs.rmSync(root,{recursive:true,force:true});fs.rmSync(code,{recursive:true,force:true});});
+  assert.deepEqual(checkLinks(root,{codeRoot:code}),[]);
+  fs.unlinkSync(path.join(code,'docs/guide.md'));
+  assert.equal(checkLinks(root,{codeRoot:code}).filter(f=>f.severity==='fail').length,1);
+});
+test('separate code root preserves anchor checks and rejects brain-root traversal', t => {
+  const root=makeBrain({'topics/example.md':'[guide](../docs/guide.md#missing)\n[escape](../../docs/guide.md)\n[memory](../memory/missing.md)'});
+  const code=makeBrain({'docs/guide.md':'# Overview','memory/missing.md':'# Must not conceal missing brain data'});
+  t.after(()=>{fs.rmSync(root,{recursive:true,force:true});fs.rmSync(code,{recursive:true,force:true});});
+  const flags=checkLinks(root,{codeRoot:code});
+  assert.equal(flags.filter(f=>f.severity==='fail').length,2);
+  assert.equal(flags.filter(f=>f.type==='anchor').length,1);
+});
+
 test('extractLinks finds relative md links, skips http/absolute/wikilinks/anchors-only', () => {
   const links = extractLinks([
     'See [daily](../../daily-memories/2026-07-01.md) and [sec](notes.md#payment).',

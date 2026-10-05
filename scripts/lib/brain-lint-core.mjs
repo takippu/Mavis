@@ -168,13 +168,13 @@ export function headingSlugs(content) {
 
 const LINK_SCAN_DIRS = ['topics', 'preferences', 'rules', 'projects', 'daily-memories'];
 
-export function checkLinks(root) {
+export function checkLinks(root, { codeRoot = root } = {}) {
   const flags = [];
   const headingCache = new Map(); // abs target -> Set of slugs
   for (const abs of walkMd(root, LINK_SCAN_DIRS)) {
     const content = readMd(abs);
     for (const { target, anchor, line } of extractLinks(content)) {
-      const targetAbs = path.resolve(path.dirname(abs), target);
+      let targetAbs = path.resolve(path.dirname(abs), target);
       // Containment BEFORE any fs call. A link target is the one untrusted input here
       // (daily-memories/ and notes.md carry pasted third-party text). Two escapes, one
       // check: '\\host\share\x.md' matches none of extractLinks' remote/absolute
@@ -189,6 +189,12 @@ export function checkLinks(root) {
         });
         continue;
       }
+      // Code assets are not uploaded with memory. Only known code locations may
+      // resolve against the checkout; missing memory links must still fail.
+      const targetRelative=rel(root,targetAbs);
+      const codeDirectory=['docs','skills','scripts','mavis','packages'].includes(targetRelative.split('/')[0]);
+      const codeFile=['README.md','AGENTS.md','CLAUDE.md','SETUP.md'].includes(targetRelative);
+      if(codeDirectory || codeFile)targetAbs=path.resolve(codeRoot,targetRelative);
       if (!fs.existsSync(targetAbs)) {
         flags.push({
           type: 'dangling-link', severity: 'fail', file: rel(root, abs),
@@ -430,7 +436,7 @@ export function lint(root, { codeRoot = root } = {}) {
     );
   const flags = [
     ...checkSizes(root),
-    ...checkLinks(root),
+    ...checkLinks(root, { codeRoot }),
     ...checkRefRules(root),
     ...checkProjectsIndex(root),
     ...checkCheckpointBullets(root),
