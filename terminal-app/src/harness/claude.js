@@ -40,10 +40,10 @@ function resolveBin() {
 // extension-less / .ps1 shim is not a spawnable exe either, so let cmd resolve it via PATHEXT.
 // Shared by ptyCommand (interactive TUI) and headlessCommand (brain-chat/dailyops) below — the
 // shim-wrapping is identical for both, only the flags that follow it differ.
-function winShim(binPath) {
+function winShim(binPath, platform = process.platform) {
   let file = binPath;
   let args = [];
-  if (process.platform === 'win32') {
+  if (platform === 'win32') {
     if (/\.(cmd|bat)$/i.test(binPath)) {
       file = process.env.COMSPEC || 'cmd.exe';
       args = ['/c', binPath];
@@ -58,8 +58,8 @@ function winShim(binPath) {
 // { file, args } for node-pty — the INTERACTIVE TUI path (pty-session.js) only. Always carries a
 // --permission-mode (or --dangerously-skip-permissions), which only makes sense where a human is
 // at the keyboard to be gated. Do NOT reuse this for a headless spawn — see headlessCommand below.
-function ptyCommand({ binPath, hookSettingsPath, permissionMode } = {}) {
-  let { file, args } = winShim(binPath);
+function ptyCommand({ binPath, hookSettingsPath, permissionMode, platform = process.platform } = {}) {
+  let { file, args } = winShim(binPath, platform);
   if (hookSettingsPath) args = args.concat(['--settings', hookSettingsPath]);
   if (permissionMode === 'yolo') args = args.concat(['--dangerously-skip-permissions']);
   else args = args.concat(['--permission-mode', PERM_MODES[permissionMode] ? permissionMode : 'default']);
@@ -73,8 +73,8 @@ function ptyCommand({ binPath, hookSettingsPath, permissionMode } = {}) {
 // for this path was a category error introduced by the harness-adapter refactor: 'plan' mode makes
 // Claude research-then-propose-a-plan via ExitPlanMode, which is not in --allowedTools, so a headless
 // turn never returns a usable reply. See Finding 1, 2026-07-26 whole-branch review.
-function headlessCommand({ binPath } = {}) {
-  return winShim(binPath);
+function headlessCommand({ binPath, platform = process.platform } = {}) {
+  return winShim(binPath, platform);
 }
 
 // Headless (brain-chat / dailyops). Claude takes the prompt on STDIN and emits ONE json object.

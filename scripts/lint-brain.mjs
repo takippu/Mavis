@@ -32,4 +32,6 @@ if (process.argv.includes('--json')) {
     console.log(`${f.severity.toUpperCase().padEnd(4)} ${f.type.padEnd(13)} ${f.file} — ${f.detail} -> ${f.suggestedAction}`);
   console.log(`\n${report.counts.fail} fail, ${report.counts.warn} warn`);
 }
-process.exit(report.counts.fail > 0 ? 1 : 0);
+// Let piped stdout drain before exiting (Electron's Node mode can otherwise truncate
+// a larger JSON report at 8192 bytes and leave the desktop health card unreadable).
+process.exitCode = report.counts.fail > 0 ? 1 : 0;

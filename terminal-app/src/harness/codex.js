@@ -55,10 +55,10 @@ function hookOverrides(hookCommand) {
   return out;
 }
 
-function ptyCommand({ binPath, hookCommand, permissionMode } = {}) {
+function ptyCommand({ binPath, hookCommand, permissionMode, platform = process.platform } = {}) {
   let file = binPath;
   let args = [];
-  if (process.platform === 'win32') {
+  if (platform === 'win32') {
     if (/\.(cmd|bat)$/i.test(binPath)) {
       file = process.env.COMSPEC || 'cmd.exe';
       args = ['/c', binPath];
@@ -79,8 +79,8 @@ function ptyCommand({ binPath, hookCommand, permissionMode } = {}) {
 // read-only + never: Codex 0.149.1 removed untrusted, and no TTY exists to answer an approval
 // prompt. This function exists only so brain-chat/dailyops can call the SAME method name
 // (`adapter.headlessCommand`) on both adapters without a harness-specific branch.
-function headlessCommand({ binPath, hookCommand, permissionMode } = {}) {
-  return ptyCommand({ binPath, hookCommand, permissionMode });
+function headlessCommand({ binPath, hookCommand, permissionMode, platform = process.platform } = {}) {
+  return ptyCommand({ binPath, hookCommand, permissionMode, platform });
 }
 
 // codex exec takes the prompt POSITIONALLY (not on stdin) and streams JSONL, so callers parse line

@@ -48,7 +48,7 @@
   const flow = ctrl.state;
   function resetFlow(state) {
     flow.state = state; flow.steps = null; flow.genStep = 0; flow.sessionId = null; flow.questions = null;
-    flow.note = null; flow.answers = {}; flow.draft = ''; flow.manual = false; flow.composed = null; flow.detailed = false; flow.error = null;
+    flow.variants = {}; flow.edited = false; flow.note = null; flow.answers = {}; flow.draft = ''; flow.manual = false; flow.composed = null; flow.detailed = false; flow.error = null;
   }
 
   // ---- live render targets (refreshed on every render) ----
@@ -131,6 +131,7 @@
   }
 
   async function startGenerate() {
+    if (flow.edited && !await MT.confirm({ title: 'Replace your draft?', message: 'Regenerating replaces your unsaved standup edits.', okLabel: 'Regenerate', danger: false })) return;
     resetFlow('generating'); flow.date = ctxDate; flow.steps = GEN_STEPS;
     paint();
     const r = await ctrl.run(() => window.mavis.dailyopsGenStart(ctxDate));
@@ -191,37 +192,8 @@
   }
 
   function paintGenerating() {
-    const steps = flow.steps || GEN_STEPS;
-    if (typeof flow.genStep !== 'number' || flow.genStep < 0) flow.genStep = 0;
-    const wrap = el('div', 'mt-do-steps');
-    wrap.setAttribute('role', 'status');
-    wrap.setAttribute('aria-live', 'polite');
-    bodyEl.appendChild(wrap);
-    const addStep = (idx, done) => {
-      const s = el('div', 'mt-do-step ' + (done ? 'done' : 'current'));
-      const ico = el('span', 'mt-do-step-ico');
-      if (done) ico.textContent = '✓';
-      else { const sp = el('span', 'mt-do-spinner'); sp.setAttribute('aria-hidden', 'true'); ico.appendChild(sp); }
-      s.appendChild(ico);
-      s.appendChild(el('span', 'mt-do-step-label', steps[idx]));
-      wrap.appendChild(s);
-      requestAnimationFrame(() => s.classList.add('in'));
-    };
-    // Resume the loader where it left off: prior steps as ✓, the current one spinning. Coming back
-    // from another view re-renders from flow.genStep instead of snapping to step 1.
-    const cap = Math.min(flow.genStep, steps.length - 1);
-    for (let k = 0; k < cap; k++) addStep(k, true);
-    addStep(cap, false);
-    const advance = () => {
-      // node detached (nav-away) → freeze; paint() restarts the interval from flow.genStep on return.
-      if (!wrap.isConnected) { clearInterval(genTimer); genTimer = null; return; }
-      if (flow.genStep >= steps.length - 1) { clearInterval(genTimer); genTimer = null; return; } // last step spins until the result lands
-      const cur = wrap.querySelector('.mt-do-step.current');
-      if (cur) { cur.classList.remove('current'); cur.classList.add('done'); const ic = cur.querySelector('.mt-do-step-ico'); if (ic) ic.textContent = '✓'; }
-      flow.genStep++;
-      addStep(flow.genStep, false);
-    };
-    genTimer = setInterval(advance, 1500);
+    const wrap = el('div', 'mt-do-steps'); wrap.setAttribute('role', 'status'); wrap.setAttribute('aria-live', 'polite');
+    const step = el('div', 'mt-do-step current in'); const spinner = el('span', 'mt-do-spinner'); spinner.setAttribute('aria-hidden', 'true'); step.append(spinner, el('span', '', 'Preparing your daily plan…')); wrap.append(step); bodyEl.append(wrap);
   }
 
   function paintAsking() {
@@ -250,7 +222,7 @@
       sw.setAttribute('role', 'switch'); sw.setAttribute('aria-checked', flow.detailed ? 'true' : 'false');
       const track = el('span', 'mt-switch-track'); track.appendChild(el('span', 'mt-switch-thumb')); sw.appendChild(track);
       sw.appendChild(el('span', 'mt-switch-label', 'Detailed (sub-bullets)'));
-      sw.addEventListener('click', () => { flow.detailed = !flow.detailed; flow.draft = flow.composed[flow.detailed ? 'detailed' : 'concise']; paint(); });
+      sw.addEventListener('click', () => { MT.workspaceData.variant(flow, !flow.detailed); paint(); });
       tog.appendChild(sw);
       bodyEl.appendChild(tog);
     }
@@ -259,10 +231,10 @@
     ta.value = flow.draft || '';
     ta.rows = 16;
     if (flow.manual) ta.placeholder = 'DD/MM/YYYY - Day - Name\n\nPrevious Work Day - …\n      - Project : …\n\nIssues Faced\n    - None\n\nToday\n      - Project : …';
-    ta.addEventListener('input', () => { flow.draft = ta.value; });
+    ta.addEventListener('input', () => { flow.draft = ta.value; flow.edited = true; });
     bodyEl.appendChild(ta);
     const row = el('div', 'mt-do-form-actions');
-    const save = el('button', 'mt-pill', 'Save');
+    const save = el('button', 'mt-pill', 'Save Standup');
     save.title = 'Save to standups/' + (ctxDate || '') + '.md';
     const status = el('span', 'mt-do-form-status');
     status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
@@ -271,8 +243,8 @@
       if (!text.trim()) { status.textContent = 'Nothing to save.'; return; }
       save.disabled = true; save.textContent = 'Saving…';
       let r;
-      try { r = await window.mavis.dailyopsSave({ date: ctxDate, text }); } catch { r = null; }
-      if (!r || !r.ok) { save.disabled = false; save.textContent = 'Save'; status.textContent = (r && r.reason) || 'Could not save.'; return; }
+      try { r = await window.mavis.dailyopsSave({ date: flow.date || ctxDate, text }); } catch { r = null; }
+      if (!r || !r.ok) { save.disabled = false; save.textContent = 'Save Standup'; status.textContent = (r && r.reason) || 'Could not save.'; return; }
       try { await navigator.clipboard.writeText(r.text || ''); } catch { /* optional */ }
       resetFlow('saved'); flow.date = ctxDate;
       MT.dailyops.render(viewHost); // refresh history + panel
@@ -301,7 +273,7 @@
       host.innerHTML = '';
       viewHost = host;
       host.appendChild(el('div', 'mt-page-title', 'DailyOps'));
-      host.appendChild(el('div', 'mt-sub', 'Your saved standups (standups/) — past entries on the left, today’s generator on the right.'));
+      host.appendChild(el('div', 'mt-sub', 'Your saved standups (standups/) — today’s plan first, saved history alongside.'));
 
       let entries = [];
       let ctx = null;
@@ -330,15 +302,15 @@
       panel.appendChild(body);
       bodyEl = body;
 
-      layout.appendChild(hist);
       layout.appendChild(panel);
+      layout.appendChild(hist);
       host.appendChild(layout);
 
-      // Rehydrate an in-flight flow for TODAY; otherwise show saved/idle. A day
-      // rollover (flow.date !== ctxDate) discards a stale flow.
-      const rehydrate = ACTIVE.includes(flow.state) && flow.date === ctxDate;
+      // Keep an unsaved flow across navigation and midnight; save under its original date.
+      const rehydrate = ACTIVE.includes(flow.state);
       if (!rehydrate) { resetFlow(todayEntry ? 'saved' : 'idle'); flow.date = ctxDate; }
       paint();
+      if (rehydrate && flow.date !== ctxDate) body.prepend(el('p', 'ws-notice', 'Draft from ' + flow.date + ' is preserved; saving keeps its original date.'));
     },
   };
 

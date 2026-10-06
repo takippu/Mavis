@@ -6,7 +6,7 @@
          file paths + contents). All scripts/styles/fonts are local ('self' = the file: origin);
          img also allows data:/blob: (pasted-image + PM thumbnails); no eval (CM5/xterm need none),
          no remote origins. The Map <webview> is a separate guest, not governed by this CSP. -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; worker-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'" />
     <link rel="stylesheet" href="../../node_modules/@xterm/xterm/css/xterm.css" />
     <link rel="stylesheet" href="./steep.css" />
     <!-- CodeMirror 5 (UMD) — the Files-view editor. Loaded straight from node_modules like xterm
@@ -37,6 +37,8 @@
     <link rel="stylesheet" href="./files.css" />
     <link rel="stylesheet" href="./changes.css" />
     <link rel="stylesheet" href="./suggested-commands.css" />
+    <link rel="stylesheet" href="./editor-build/editor-entry.css" />
+    <link rel="stylesheet" href="./workspace.css" />
     <title>Mavis-Terminal</title>
   </head>
   <body>
@@ -65,6 +67,7 @@
 
     <!-- MT modules (attach to window.MT); app.js orchestrates last -->
     <script src="./icons.js"></script>
+    <script src="./workspace-data.js"></script>
     <script src="./context-menu.js"></script>
     <script src="./dropdown.js"></script>
     <script src="./confirm.js"></script>
@@ -102,6 +105,7 @@
     <!-- MUST stay above app.js: buildSidebar() calls MT.brainHealth.mountBadge() during app.js's
          boot, and `MT.x = ...` is not hoisted across files any more than within one. -->
     <script src="./brain-health-view.js"></script>
-    <script src="./app.js"></script>
+    <script src="./editor-build/editor-entry.js"></script>
+    <script src="./workspace-app.js"></script>
   </body>
 </html>

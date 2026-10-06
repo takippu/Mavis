@@ -1,8 +1,8 @@
 {
   "name": "mavis-terminal",
-  "version": "0.6.2",
+  "version": "0.8.4",
   "private": true,
-  "description": "Desktop shell that loads Mavis on launch — embeds Claude Code or Codex with a harness-aware Mavis autorun command + a read-only project sidebar.",
+  "description": "Mavis desktop coding workspace with project tabs, Monaco editor, terminals and persistent memory",
   "license": "MIT",
   "author": "Thaqif",
   "repository": {
@@ -16,20 +16,30 @@
   "homepage": "https://github.com/takippu/Mavis/tree/main/terminal-app#readme",
   "main": "src/main.js",
   "scripts": {
-    "start": "electron .",
+    "start": "npm run build:editor && electron .",
+    "build:editor": "node scripts/build-editor.js",
+    "predist": "npm run build:editor",
+    "predist:win": "npm run build:editor",
     "test": "node --test \"test/*.test.js\"",
     "dist": "electron-builder --win",
-    "postdist": "node scripts/copy-portable.js"
+    "postdist": "node scripts/copy-portable.js",
+    "dist:win": "electron-builder --win",
+    "dist:mac": "electron-builder --mac --arm64 && node scripts/install-mac.js",
+    "install:mac": "node scripts/install-mac.js",
+    "postinstall": "node scripts/prepare-mac.js",
+    "predist:mac": "node scripts/prepare-mac.js && npm run build:editor"
   },
   "dependencies": {
     "@xterm/addon-fit": "^0.10.0",
     "@xterm/xterm": "^5.5.0",
     "codemirror": "^5.65.21",
+    "monaco-editor": "0.52.2",
     "node-pty": "^1.0.0"
   },
   "devDependencies": {
     "electron": "^33.2.0",
-    "electron-builder": "^25.1.8"
+    "electron-builder": "^25.1.8",
+    "esbuild": "0.25.12"
   },
   "build": {
     "appId": "com.trlabs.mavisterminal",
@@ -54,6 +64,15 @@
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
       "shortcutName": "Mavis-Terminal"
+    },
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "icon": "src/renderer/assets/mavis-logo.png",
+      "identity": null,
+      "target": [
+        "dmg",
+        "zip"
+      ]
     }
   }
 }

@@ -41,9 +41,9 @@ const SCHEMA = {
   },
   appTheme: {
     type: 'string', label: 'App theme', applies: 'live', default: 'light',
-    enum: ['light', 'sepia', 'slate', 'pine', 'morflax', 'ink', 'nocturne', 'xai', 'resend'],
+    enum: ['system', 'light', 'dark', 'sepia', 'slate', 'pine', 'morflax', 'ink', 'nocturne', 'xai', 'resend'],
     enumLabels: {
-      light: 'Steep Light', sepia: 'Sepia', slate: 'Slate', pine: 'Pine', morflax: 'Morflax',
+      system: 'System', light: 'Light', dark: 'Dark', sepia: 'Sepia', slate: 'Slate', pine: 'Pine', morflax: 'Morflax',
       ink: 'Ink — dark', nocturne: 'Nocturne — dark', xai: 'xAI Void — dark', resend: 'Resend Obsidian — dark',
     },
   },

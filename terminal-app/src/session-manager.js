@@ -18,6 +18,7 @@ class SessionManager {
     this._spawn = spawn || startAgentPty;
     this._spawnShell = spawnShell || startShellPty;
     this._seq = 0;
+    this._pendingExits = new Map();
   }
 
   // create({ cwd, cols, rows, label, kind, harness, autorun:{command,delayMs} }) →
@@ -45,6 +46,8 @@ class SessionManager {
       enterTimer: null,
     };
 
+    let finishExit;
+    const exitPromise = new Promise(resolve => { finishExit = resolve; });
     const spawner = isShell ? this._spawnShell : this._spawn;
     const res = spawner({
       cwd,
@@ -79,6 +82,8 @@ class SessionManager {
         if (s && s.autorunTimer) clearTimeout(s.autorunTimer);
         if (s && s.enterTimer) clearTimeout(s.enterTimer);
         this.sessions.delete(id);
+        this._pendingExits.delete(id);
+        finishExit();
         this.onExit(id, code);
       },
     });
@@ -86,6 +91,7 @@ class SessionManager {
     if (!res.ok) return { ok: false, reason: res.reason };
 
     rec.term = res.term;
+    this._pendingExits.set(id, exitPromise);
     this.sessions.set(id, rec);
     return { ok: true, id, label: rec.label, cwd: rec.cwd, kind: rec.kind, harness: harnessId };
   }
@@ -120,6 +126,13 @@ class SessionManager {
 
   closeAll() {
     for (const id of [...this.sessions.keys()]) this.close(id);
+  }
+
+  async shutdown() {
+    // Pane removal is synchronous, but native PTY exit callbacks are not. Keep
+    // Electron alive until callbacks finish, including already closed panes.
+    this.closeAll();
+    await Promise.all([...this._pendingExits.values()]);
   }
 
   // non-null cwds of all live sessions — the trusted Files-view root allowlist (see main.js).

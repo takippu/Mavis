@@ -1,9 +1,12 @@
 'use strict';
 
-const { app, BrowserWindow, ipcMain, shell, Notification, dialog, clipboard } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, Notification, dialog, clipboard, Menu, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { fileURLToPath } = require('url');
+
+require('./mac-environment').restoreMacPath();
+if (!app.isPackaged && process.env.MAVIS_TEST_USER_DATA) app.setPath('userData', process.env.MAVIS_TEST_USER_DATA);
 
 const config = require('./config');
 const harnessRegistry = require('./harness');
@@ -37,6 +40,10 @@ let sessionReader = null; // status sidecar: token -> session id -> 'session:sta
 let brainHealth = null; // lint report cache; survives view nav because it lives in main, not a view
 let repairGate = null;  // preview -> approve -> apply gate; holds previewed plans (see brain-health.js)
 let terminalFocused = false; // a terminal pane has DOM focus → keep Ctrl+R for the CLI's reverse search
+let workspaces = null;
+let closeApproved = false;
+let quitting = false;
+let stoppingTerminals = false;
 const notifiedSessions = new Set(); // sessions already alerted this attention episode
 
 function send(channel, payload) {
@@ -49,11 +56,7 @@ function send(channel, payload) {
 // projects/, daily-memories/ are gitignored and only appear after the setup wizard runs), and
 // accepting a lone CLAUDE.md would let ANY Claude Code project pass as a brain.
 function isBrainRoot(dir) {
-  if (!dir) return false;
-  const has = (...parts) => { try { return fs.existsSync(path.join(dir, ...parts)); } catch { return false; } };
-  const contract = has('AGENTS.md') || has('CLAUDE.md');
-  const brainish = has('SETUP.md') || has('identity') || has('projects') || has('daily-memories');
-  return contract && brainish;
+  return require('./brain-location').isBrainRoot(dir, cfg.CODE_ROOT);
 }
 
 // Where a packaged build looks for the brain when nothing is configured. Packaged __dirname lives
@@ -88,7 +91,7 @@ function promptForBrainRoot(current) {
     type: 'warning',
     title: 'Mavis brain not found',
     message: 'No Mavis brain at:\n' + current,
-    detail: 'Mavis-Terminal reads a brain folder — your clone of the Mavis repo (the one holding AGENTS.md and SETUP.md).\n\n'
+    detail: 'Mavis-Terminal reads your memory folder (identity and projects), or a combined Mavis checkout.\n\n'
       + 'Pick that folder now, or continue and set it later in Settings → Brain folder. Until it points at a real brain, the brain views will be empty.',
     buttons: ['Choose folder...', 'Continue anyway'],
     defaultId: 0,
@@ -122,16 +125,19 @@ function settingsValues() {
     dailyOpsOffDays: cfg.DAILYOPS_OFF_DAYS,
     projectsRoot: cfg.PROJECTS_ROOT,
     harness: cfg.HARNESS,
+    permissionMode: cfg.PERMISSION_MODE,
+    pmEnabled: cfg.PM_ENABLED ? 'on' : 'off',
+    pmBaseUrl: cfg.PM_BASE_URL,
   };
 }
 
 function createWindow() {
   win = new BrowserWindow({
-    width: 1200,
-    height: 800,
+    ...require('./window-state').read(userDataDir, screen.getAllDisplays().map(d => d.workArea)),
     minWidth: 900,
     minHeight: 560,
-    frame: false,
+    frame: process.platform === 'darwin',
+    ...(process.platform === 'darwin' ? { titleBarStyle: 'hiddenInset', trafficLightPosition: { x: 16, y: 20 } } : {}),
     show: false,
     backgroundColor: '#f7f7f8',
     title: 'Mavis-Terminal',
@@ -156,7 +162,8 @@ function createWindow() {
     },
   });
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
-  win.once('ready-to-show', () => { win.maximize(); win.show(); });
+  win.once('ready-to-show', () => { win.show(); });
+  win.on('close', event => { if (!closeApproved) { event.preventDefault(); send('workspace:close-request', { quitting }); } else { require('./window-state').write(userDataDir, win.getNormalBounds()); workspaces?.closeAll(); } });
   // Chromium's default Ctrl+R / Ctrl+Shift+R / F5 reload accelerators are live even with no
   // app menu bar shown (frameless window) — an accidental hit nukes the whole renderer (every
   // open tab, in-progress Ask-Mavis turn) with zero warning. Intercept and hand off to the
@@ -194,6 +201,15 @@ app.whenReady().then(() => {
   // clicking a toast → bring the main window forward + jump to that session
   toastWindow.setHandlers({ onActivate: (id) => { try { if (win && !win.isDestroyed()) { win.show(); win.focus(); } } catch { /* noop */ } if (id) send('activate-session', { id }); } });
   userDataDir = app.getPath('userData');
+  workspaces = require('./workspace-ipc').install({ ipcMain, dialog, shell, clipboard, getWindow: () => win, dir: userDataDir, getProjects: () => listProjectsWithDirs(cfg.BRAIN_ROOT), getSessions: () => sessions, send, autorunFor: (kind, slug) => ({ command: cfg.autorunCommandForHarness(kind) + (slug ? ' ' + slug : ''), enterDelayMs: cfg.AUTORUN_ENTER_DELAY_MS }) });
+  const command = id => () => send('workspace:command', id);
+  Menu.setApplicationMenu(Menu.buildFromTemplate([
+    ...(process.platform === 'darwin' ? [{ label: 'Mavis', submenu: [{ role: 'about' }, { type: 'separator' }, { label: 'Settings…', accelerator: 'CmdOrCtrl+,', click: command('settings') }, { role: 'hide' }, { role: 'hideOthers' }, { role: 'unhide' }, { type: 'separator' }, { role: 'quit' }] }] : []),
+    { label: 'File', submenu: [{ label: 'Open Folder…', accelerator: 'CmdOrCtrl+O', click: command('open') }, { label: 'Quick Open…', accelerator: 'CmdOrCtrl+P', click: command('quickOpen') }, { type: 'separator' }, { label: 'Save', accelerator: 'CmdOrCtrl+S', click: command('save') }, { label: 'Save All', accelerator: 'CmdOrCtrl+Alt+S', click: command('saveAll') }, { label: 'Save As…', accelerator: 'CmdOrCtrl+Shift+S', click: command('saveAs') }, { type: 'separator' }, { label: 'Close Tab', accelerator: 'CmdOrCtrl+W', click: command('closeResource') }, { label: 'Close Project', click: command('closeProject') }, { label: 'Close Window', accelerator: 'CmdOrCtrl+Shift+W', click: () => win?.close() }] },
+    { label: 'Edit', submenu: [{ role: 'undo' }, { role: 'redo' }, { type: 'separator' }, { role: 'cut' }, { role: 'copy' }, { role: 'paste' }, { role: 'selectAll' }, { type: 'separator' }, { label: 'Find', accelerator: 'CmdOrCtrl+F', click: command('find') }, { label: 'Search Project', accelerator: 'CmdOrCtrl+Shift+F', click: command('search') }] },
+    { label: 'View', submenu: [{ label: 'Command Palette', accelerator: 'CmdOrCtrl+Shift+P', click: command('palette') }, { label: 'Toggle Sidebar', accelerator: 'CmdOrCtrl+B', click: command('sidebar') }, { label: 'Toggle Terminal', click: command('terminal') }, { label: 'Toggle Mavis Pane', click: command('inspector') }, { label: 'Split Editor', click: command('splitEditor') }, { role: 'togglefullscreen' }] },
+    { label: 'Terminal', submenu: ['shell', 'claude', 'codex'].map(kind => ({ label: 'New ' + kind + ' Terminal', click: command(kind) })) }, { role: 'windowMenu' },
+  ]));
   // Status sidecar: write the emitter, clear any crash leftovers, and start the reader. Each agent
   // spawn bakes its own token into its hook command (pty-session), so a line landing in
   // <userData>/session-events/<token>.jsonl identifies the pane that produced it. MAVIS_USER_DATA
@@ -214,9 +230,9 @@ app.whenReady().then(() => {
   // Dev is untouched: config.js keeps resolving relative to the repo.
   if (app.isPackaged) {
     const configured = String(settingsStore.read(userDataDir).brainRoot || '').trim();
-    const brain = configured || process.env.MAVIS_BRAIN_ROOT || defaultBrainRoot(app.getPath('home'));
+    const brain = configured || process.env.MAVIS_BRAIN_ROOT || (isBrainRoot(config.BRAIN_ROOT) ? config.BRAIN_ROOT : defaultBrainRoot(app.getPath('home')));
     process.env.MAVIS_BRAIN_ROOT = brain;
-    if (!process.env.MAVIS_VIZ_ROOT) process.env.MAVIS_VIZ_ROOT = path.join(brain, 'viz');
+    if (!process.env.MAVIS_VIZ_ROOT) process.env.MAVIS_VIZ_ROOT = path.join(config.CODE_ROOT, 'viz');
   }
   cfg = config.load(userDataDir);
   // Whatever the resolution path, the root may still not be a brain (never configured, folder
@@ -235,7 +251,7 @@ app.whenReady().then(() => {
   process.env.MAVIS_PERMISSION_MODE = cfg.PERMISSION_MODE; // permission mode for claude spawns (pty-session)
   sessions = new SessionManager({
     onData: (id, data) => send('pty-data', { id, data }),
-    onExit: (id, code) => send('pty-exit', { id, code }),
+    onExit: (id, code) => { workspaces?.releaseTerminal(id); send('pty-exit', { id, code }); },
   });
   // token -> session id, resolved per event. Cheap: the map is at most one entry per open tab. A
   // token with no live session (pane already closed, or a leftover from before this boot) is
@@ -359,7 +375,7 @@ ipcMain.handle('session:commands', async (_e, id) => {
 
 // ---- data ----
 ipcMain.handle('list-projects', async () => {
-  try { return listProjectsWithDirs(cfg.BRAIN_ROOT); } catch { return []; }
+  try { return listProjectsWithDirs(cfg.BRAIN_ROOT).map(p => ({ ...p, dir: workspaces?.projectFolder(p.slug) || p.dir })); } catch { return []; }
 });
 ipcMain.handle('get-dashboard-data', async () => {
   try { return getDashboardData(cfg.BRAIN_ROOT); }
@@ -372,13 +388,13 @@ ipcMain.handle('search-brain', async (_e, q) => {
   try { return searchBrain(cfg.BRAIN_ROOT, q); } catch { return []; }
 });
 ipcMain.handle('daily-memories:list', async () => {
-  try { return listDailyMemories(cfg.BRAIN_ROOT); } catch { return []; }
+  fs.accessSync(cfg.BRAIN_ROOT, fs.constants.R_OK); return listDailyMemories(cfg.BRAIN_ROOT);
 });
 ipcMain.handle('daily-memory:get', async (_e, date) => {
   try { return getDailyMemory(cfg.BRAIN_ROOT, date); } catch { return null; }
 });
 ipcMain.handle('topics:list', async () => {
-  try { return listTopics(cfg.BRAIN_ROOT); } catch { return []; }
+  fs.accessSync(cfg.BRAIN_ROOT, fs.constants.R_OK); return listTopics(cfg.BRAIN_ROOT);
 });
 ipcMain.handle('brain:cat-entries', async (_e, category) => {
   try { return listCategoryEntries(cfg.BRAIN_ROOT, category); } catch { return []; }
@@ -691,6 +707,7 @@ ipcMain.handle('path-exists', async (_e, p) => {
 // Returns the resolved absolute root, or null when the request isn't trusted.
 function trustedFilesRoot(requested) {
   const allowed = [cfg.BRAIN_ROOT, cfg.PTY_CWD];
+  if (workspaces) allowed.push(...workspaces.roots());
   try { if (sessions) for (const c of sessions.liveCwds()) allowed.push(c); } catch { /* noop */ }
   const norm = (x) => { const r = path.resolve(String(x == null ? '' : x)); return process.platform === 'win32' ? r.toLowerCase() : r; };
   if (requested == null || requested === '') return cfg.BRAIN_ROOT; // no root named → brain-root fallback
@@ -824,11 +841,21 @@ ipcMain.handle('git:push', gitCall((root) => gitRepo.push(root)));
 ipcMain.handle('git:branches', gitCall((root) => gitRepo.branches(root)));
 ipcMain.handle('git:checkout', gitCall((root, p) => gitRepo.checkout(root, p.name)));
 
-app.on('will-quit', () => { if (brainWatch) brainWatch.close(); if (sessionReader) sessionReader.stop(); vizServer.stopVizServer(); dailyopsAgent.cancelAll(); brainChat.cancelAll(); toastWindow.destroy(); });
+ipcMain.on('workspace:close-approved', async e => {
+  if (e.sender !== win?.webContents || stoppingTerminals) return;
+  stoppingTerminals = true;
+  try {
+    await sessions?.shutdown();
+    closeApproved = true;
+    if (quitting) app.quit(); else win?.close();
+  } finally { stoppingTerminals = false; }
+});
+app.on('before-quit', e => { quitting = true; if (win && !closeApproved) { e.preventDefault(); send('workspace:close-request', { quitting: true }); } });
+app.on('will-quit', () => { workspaces?.closeAll(); if (brainWatch) brainWatch.close(); if (sessionReader) sessionReader.stop(); vizServer.stopVizServer(); dailyopsAgent.cancelAll(); brainChat.cancelAll(); toastWindow.destroy(); });
 app.on('window-all-closed', () => {
   if (sessions) sessions.closeAll();
   if (process.platform !== 'darwin') app.quit();
 });
 app.on('activate', () => {
-  if (BrowserWindow.getAllWindows().length === 0) createWindow();
+  if (BrowserWindow.getAllWindows().length === 0) { closeApproved = false; quitting = false; createWindow(); }
 });

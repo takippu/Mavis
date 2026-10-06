@@ -148,6 +148,7 @@ async function searchFiles(root, query, opts = {}) {
   let truncated = false;
 
   while (stack.length && scanned < MAX_SEARCH_FILES) {
+    if (opts.signal?.aborted) return { results: [], cancelled: true, scanned };
     const current = stack.pop();
     let dirents;
     try { dirents = await fsp.readdir(current.abs, { withFileTypes: true }); }
@@ -155,6 +156,7 @@ async function searchFiles(root, query, opts = {}) {
     // Reverse alpha because this is a LIFO stack; results still walk alpha top-down.
     dirents.sort((a, b) => b.name.localeCompare(a.name, undefined, { sensitivity: 'accent' }));
     for (const d of dirents) {
+      if (opts.signal?.aborted) return { results: [], cancelled: true, scanned };
       if (IGNORE.has(d.name)) continue;
       // Never descend through a symlink/junction. safeResolve rejects links that leave the root,
       // but an in-root link back to an ancestor is still a recursive cycle.

@@ -22,7 +22,7 @@ const codex = require('../src/harness/codex');
 
 test('claude headless command line: no --permission-mode (the substance of the fix)', () => {
   const h = claude.headlessArgs({ prompt: 'hi', sessionId: 'abc-123', resume: false, allowedTools: 'Read,Glob,Grep' });
-  const cmd = claude.headlessCommand({ binPath: 'C:/npm/claude.cmd', permissionMode: 'plan' });
+  const cmd = claude.headlessCommand({ platform: 'win32', binPath: 'C:/npm/claude.cmd', permissionMode: 'plan' });
   const args = cmd.args.concat(h.args);
 
   // Pre-branch (git show ed5a413:terminal-app/src/brain-chat.js): the composed spawn was
@@ -53,7 +53,7 @@ test('claude headless command line on --resume carries no permission flag either
 
 test('codex headless command line uses the supported non-interactive plan policy', () => {
   const h = codex.headlessArgs({ prompt: 'hi' });
-  const cmd = codex.headlessCommand({ binPath: 'C:/npm/codex.cmd', permissionMode: 'plan' });
+  const cmd = codex.headlessCommand({ platform: 'win32', binPath: 'C:/npm/codex.cmd', permissionMode: 'plan' });
   const args = cmd.args.concat(h.args);
 
   assert.match(cmd.file, /cmd\.exe$/i);
@@ -80,7 +80,7 @@ test('codex isolated DailyOps line uses non-git + stdin flags; Claude stays unto
   const h = codex.headlessArgs({
     prompt: 'dailyops', skipGitRepoCheck: true, promptOnStdin: true,
   });
-  const cmd = codex.headlessCommand({ binPath: 'C:/npm/codex.cmd', permissionMode: 'plan' });
+  const cmd = codex.headlessCommand({ platform: 'win32', binPath: 'C:/npm/codex.cmd', permissionMode: 'plan' });
   assert.deepStrictEqual(cmd.args.concat(h.args), [
     '/c', 'C:/npm/codex.cmd',
     '--no-daemon',

@@ -1,0 +1,54 @@
+'use strict';
+// Application-owned integration: disposable profile, projects, and stubbed memory/agent data.
+const fs = require('fs'), os = require('os'), path = require('path'), assert = require('assert/strict');
+const { app, BrowserWindow, ipcMain } = require('electron');
+const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mavis-ux-'));
+const data = path.join(root,'state'), folder = path.join(root,'Alpha'), brain = path.join(root,'brain');
+for (const dir of [data,folder,brain]) fs.mkdirSync(dir);
+fs.writeFileSync(path.join(brain,'AGENTS.md'),'# Disposable test brain\n');fs.mkdirSync(path.join(brain,'projects'));fs.writeFileSync(path.join(brain,'projects','_index.md'),'');fs.mkdirSync(path.join(brain,'identity'));fs.writeFileSync(path.join(brain,'identity','profile.md'),'# Test\n');
+fs.writeFileSync(path.join(folder,'hello.js'),'const hello = true;\n');
+fs.writeFileSync(path.join(folder,'readme.md'),'# Alpha\n');
+fs.writeFileSync(path.join(data,'workspace-state.json'),JSON.stringify({version:3,activeId:'alpha',workspaces:[{id:'alpha',root:folder,name:'Alpha',terminals:[]}]}));
+process.env.MAVIS_TEST_USER_DATA=data;process.env.MAVIS_BRAIN_ROOT=brain;
+const errors=[];app.on('web-contents-created',(_e,wc)=>wc.on('console-message',(_e,level,message)=>{if(level>=3)errors.push(message);}));
+require(process.env.MAVIS_SMOKE_MAIN || '../src/main');
+const replace=(channel,handler)=>{ipcMain.removeHandler(channel);ipcMain.handle(channel,handler);};
+replace('daily-memories:list',()=>[{date:'2026-10-06',projects:['alpha','beta'],count:2},{date:'2026-10-05',projects:['beta'],count:1}]);
+replace('daily-memory:get',()=>({content:'## alpha — Today\nALPHA_ONLY\n## beta — Today\nBETA_ONLY\n'}));
+replace('topics:list',()=>[{slug:'alpha-topic',did:'Alpha learned',refs:['`projects/alpha/notes.md`']},{slug:'beta-topic',did:'Beta learned',refs:['`projects/beta/notes.md`']}]);
+replace('dailyops:list',()=>[]);replace('dailyops:context',()=>({date:'2026-10-06'}));
+replace('dailyops:gen-start',()=>({kind:'done',text:'Concise original',textDetailed:'Detailed original'}));
+const delay=ms=>new Promise(r=>setTimeout(r,ms));
+app.whenReady().then(async()=>{
+ let win;for(let i=0;i<100;i++){win=BrowserWindow.getAllWindows()[0];if(win&&!win.webContents.isLoading()&&await win.webContents.executeJavaScript(`!!MT.workspace?.ready && MT.workspace.projects.size===1`))break;await delay(100);}
+ assert.ok(win);const js=async s=>{try{return await win.webContents.executeJavaScript(s);}catch(e){console.error('Renderer command:',s,'Console errors:',errors);throw e;}};const poll=async s=>{for(let i=0;i<100;i++){if(await js(s))return;await delay(50);}throw Error('Timed out: '+s);};
+ const initial=await js(`({saveDisabled:document.querySelector('[aria-label=Save]').disabled,empty:!!document.querySelector('.ws-editor-empty:not([hidden])'),brand:document.querySelector('.ws-title').textContent,detailsHidden:document.querySelector('.ws-inspector').hidden})`);
+ assert.equal(initial.saveDisabled,true);assert.equal(initial.empty,true);assert.match(initial.brand,/maviscode/);assert.equal(initial.detailsHidden,true);
+ await js(`MT.workspace.projects.get('alpha').slug='alpha'; MT.workspace.run('daily')`);
+ assert.equal(await js(`document.querySelector('#memory-scope').value`),'project');assert.match(await js(`document.querySelector('.mt-dl-main').textContent`),/ALPHA_ONLY/);assert.doesNotMatch(await js(`document.querySelector('.mt-dl-main').textContent`),/BETA_ONLY/);
+ await js(`(()=>{const s=document.querySelector('#memory-scope');s.value='all';s.dispatchEvent(new Event('change'));})()`);await poll(`document.querySelector('.mt-dl-main')?.textContent.includes('BETA_ONLY')`);
+ await js(`(()=>{const s=document.querySelector('#memory-scope');s.value='project';s.dispatchEvent(new Event('change'));})()`);await poll(`document.querySelector('#memory-scope')?.value==='project' && !document.querySelector('.mt-dl-main')?.textContent.includes('BETA_ONLY')`);
+ await js(`MT.workspace.run('topics')`);assert.match(await js(`document.querySelector('.mt-dl-rail').textContent`),/alpha-topic/);assert.doesNotMatch(await js(`document.querySelector('.mt-dl-rail').textContent`),/beta-topic/);
+ await js(`MT.workspace.run('settings')`);await js(`(()=>{const i=document.querySelector('#set-terminalFontSize');i.value='15';i.dispatchEvent(new Event('input'));})()`);
+ await js(`MT.workspace.run('projects'); MT.workspace.run('settings')`);assert.equal(await js(`document.querySelector('#set-terminalFontSize').value`),'15');
+ await js(`(()=>{const i=document.querySelector('#set-appTheme');i.value='dark';i.dispatchEvent(new Event('change'));})()`);
+ await js(`document.querySelector('.mt-settings-form').parentElement.querySelector('button.mt-pill').click()`);await poll(`document.querySelector('.mt-settings-form').parentElement.textContent.includes('Settings saved')`);
+ assert.equal(await js(`document.querySelector('.mt-settings-form').parentElement.querySelector('button.mt-pill').disabled`),true);
+ await js(`MT.workspace.run('ops')`);await js(`[...document.querySelectorAll('.ws-page button')].find(b=>b.textContent==='Generate').click()`);await poll(`document.querySelector('.mt-do-review')`);
+ await js(`(()=>{const ta=document.querySelector('.mt-do-review');ta.value='MY CONCISE EDIT';ta.dispatchEvent(new Event('input'));document.querySelector('.mt-do-detail-toggle button').click();})()`);
+ assert.equal(await js(`document.querySelector('.mt-do-review').value`),'Detailed original');await js(`(()=>{const ta=document.querySelector('.mt-do-review');ta.value='MY DETAILED EDIT';ta.dispatchEvent(new Event('input'));document.querySelector('.mt-do-detail-toggle button').click();})()`);assert.equal(await js(`document.querySelector('.mt-do-review').value`),'MY CONCISE EDIT');
+ await js(`[...document.querySelectorAll('.ws-page button')].find(b=>b.textContent==='Regenerate').click()`);await poll(`document.querySelector('.mt-confirm-overlay')`);await js(`document.querySelector('.mt-confirm-btn').click()`);assert.equal(await js(`document.querySelector('.mt-do-review').value`),'MY CONCISE EDIT');
+ await js(`MT.workspace.run('files')`);await js(`document.querySelector('.ws-tree [aria-label="hello.js"]').click()`);await poll(`MT.workspace.projects.get('alpha').docs.has('hello.js')`);assert.equal(await js(`document.querySelector('[aria-label=Save]').disabled`),true);
+ await js(`MT.workspace.projects.get('alpha').docs.get('hello.js').model.setValue('const hello = false;')`);assert.equal(await js(`document.querySelector('[aria-label=Save]').disabled`),false);await js(`MT.workspace.run('save')`);
+ await js(`MT.workspace.run('search')`);await js(`(()=>{const i=document.querySelector('.ws-search input');i.value='hello';i.dispatchEvent(new Event('input'));document.querySelector('.ws-search').dispatchEvent(new Event('submit'));})()`);await poll(`document.querySelector('.ws-search-hit')`);
+ await js(`MT.workspace.run('files');MT.workspace.run('search')`);assert.equal(await js(`document.querySelector('.ws-search input').value`),'hello');assert.ok(await js(`!!document.querySelector('.ws-search-hit')`));await js(`MT.workspace.run('files')`);
+ await js(`MT.workspace.run('shell')`);await js(`document.querySelector('[aria-label="Split terminal"]').click()`);await poll(`MT.workspace.projects.get('alpha').terminals.length===2 && MT.workspace.projects.get('alpha').terminalSplit`);
+ await js(`document.querySelector('[aria-label="Hide terminal panel"]').click()`);assert.equal(await js(`MT.workspace.projects.get('alpha').terminalVisible`),false);assert.equal(await js(`MT.workspace.projects.get('alpha').terminals.filter(t=>t.ptyId).length`),2);await js(`MT.workspace.run('terminal')`);
+ await js(`MT.workspace.run('character')`);assert.equal(await js(`document.querySelector('.mt-jtabs').hidden`),true);
+ await js(`MT.entryEditor.open({mode:'add',category:'rules'})`);assert.equal(await js(`document.getElementById('app').inert`),true);assert.equal(await js(`document.querySelector('.mt-np-card').getAttribute('aria-modal')`),'true');assert.ok(await js(`[...document.querySelectorAll('.mt-pref-form label')].every(l=>!!document.getElementById(l.htmlFor))`));await js(`document.querySelector('.mt-np-x').click()`);assert.equal(await js(`document.getElementById('app').inert`),false);
+ await js(`MT.workspace.run('files')`);
+ const evidence=path.resolve(__dirname,'../design-proposals/build-verification');fs.mkdirSync(evidence,{recursive:true});
+ for(const [view,name] of [['projects','ux-projects'],['daily','ux-memory'],['settings','ux-settings'],['ops','ux-dailyops']]){await js(`MT.workspace.run(${JSON.stringify(view)})`);await delay(100);fs.writeFileSync(path.join(evidence,name+'.png'),(await win.webContents.capturePage()).toPNG());}
+ await js(`(()=>{for(const t of MT.workspace.projects.get('alpha').terminals)mavis.sendInput(t.ptyId,'exit\\r');})()`);await poll(`MT.workspace.projects.get('alpha').terminals.every(t=>!t.ptyId)`);
+ assert.deepEqual(errors,[]);const result={ok:true,brand:true,memoryProjectDefault:true,allProjects:true,topicsScope:true,settingsDraftRetention:true,settingsSave:true,standupVariantRetention:true,regenerateCancellation:true,saveState:true,searchRetention:true,splitCreatesTerminal:true,hidePreservesProcesses:true,entryDialogAccessibility:true,errors};fs.writeFileSync(path.join(evidence,'ux-smoke.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result));app.quit();
+}).catch(e=>{console.error(e);app.exit(1);});

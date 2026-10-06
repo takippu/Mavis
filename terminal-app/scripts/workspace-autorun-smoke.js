@@ -1,0 +1,42 @@
+'use strict';
+// Disposable app integration: fake agent PTYs verify launch/submit without running a CLI.
+const fs=require('fs'),os=require('os'),path=require('path'),assert=require('assert/strict');
+const {app,BrowserWindow,ipcMain,dialog}=require('electron');
+const root=fs.mkdtempSync(path.join(os.tmpdir(),'mavis-autorun-')),data=path.join(root,'state'),brain=path.join(root,'brain'),folder=path.join(root,'Alpha'),other=path.join(root,'Other');
+const agent=process.env.MAVIS_SMOKE_AGENT || 'codex',command=agent==='codex'?'$mavis':'/mavis';
+for(const d of [data,brain,folder,other,path.join(brain,'projects'),path.join(brain,'identity'),path.join(brain,'projects','alpha')])fs.mkdirSync(d);
+fs.writeFileSync(path.join(brain,'AGENTS.md'),'# Disposable test brain\n');fs.writeFileSync(path.join(brain,'identity','profile.md'),'# Test\n');
+fs.writeFileSync(path.join(brain,'projects','_index.md'),'## Active\n- [alpha](alpha/index.md) — tool, active — Fixture.\n');
+fs.writeFileSync(path.join(brain,'projects','alpha','index.md'),'---\npath: '+folder+'\n---\n# Alpha\n');
+fs.writeFileSync(path.join(data,'settings.json'),JSON.stringify({harness:agent,autorunCommand:''}));
+fs.writeFileSync(path.join(data,'workspace-state.json'),JSON.stringify({version:3,activeId:'alpha',workspaces:[{id:'alpha',slug:'alpha',root:folder,name:'Alpha',terminals:[{id:'restored-agent',kind:agent,label:agent,cwd:fs.realpathSync(folder)}],terminalVisible:false}]}));
+process.env.MAVIS_TEST_USER_DATA=data;process.env.MAVIS_BRAIN_ROOT=brain;
+let picked=folder,cancel=false,fail=false;dialog.showOpenDialog=async()=>({canceled:cancel,filePaths:[picked]});
+const starts=[],writes=[],errors=[];
+app.on('web-contents-created',(_e,wc)=>wc.on('console-message',(_e,level,message)=>{if(level>=3)errors.push(message);}));
+require(process.env.MAVIS_SMOKE_MAIN || '../src/main');
+ipcMain.removeHandler('harness:available');ipcMain.handle('harness:available',()=>['claude','codex']);
+ipcMain.on('pty-input',(_e,p)=>writes.push(p));
+const delay=ms=>new Promise(r=>setTimeout(r,ms));
+app.whenReady().then(async()=>{
+ let win;for(let i=0;i<100;i++){win=BrowserWindow.getAllWindows()[0];if(win&&!win.webContents.isLoading()&&await win.webContents.executeJavaScript('!!MT.workspace?.ready'))break;await delay(100);}
+ win.webContents.setBackgroundThrottling(false);
+ const js=s=>win.webContents.executeJavaScript(s),poll=async s=>{for(let i=0;i<100;i++){if(await js(s))return;await delay(50);}throw Error('Timed out '+s);};
+ ipcMain.removeHandler('workspace:terminal');ipcMain.handle('workspace:terminal',(_e,p)=>{starts.push(p);return fail?{ok:false,reason:'Fixture agent unavailable'}:{ok:true,id:'fake-'+starts.length,autorun:{command:command+(p.id==='alpha'?' alpha':''),enterDelayMs:30}};});
+ ipcMain.removeHandler('workspace:terminalClose');ipcMain.handle('workspace:terminalClose',()=>({ok:true}));
+ assert.equal(starts.length,0,'Restoration must not replay commands');
+ await js(`Promise.all([MT.workspace.openProject(),MT.workspace.openProject()])`);assert.equal(starts.length,1);assert.equal(starts[0].kind,agent);assert.equal(starts[0].cwd,fs.realpathSync(folder));
+ assert.equal(await js(`MT.workspace.projects.get('alpha').terminals.length`),1);assert.equal(await js(`MT.workspace.projects.get('alpha').terminalVisible`),true);assert.equal(writes.length,0);
+ const ready=agent==='codex'?'› Ask anything\r\n100% context left':'? for shortcuts';
+ win.webContents.send('pty-data',{id:'fake-1',data:'Do you want to trust this folder?\r\n'+ready});await delay(100);assert.equal(writes.length,0,'Trust gate must block submission');
+ win.webContents.send('pty-data',{id:'fake-1',data:'\x1b[2J\x1b[H'+ready});await poll(`MT.workspace.projects.get('alpha').terminals[0].autorunSent`);await delay(100);
+ assert.deepEqual(writes,[{id:'fake-1',data:command+' alpha'},{id:'fake-1',data:'\r'}]);
+ win.webContents.send('pty-data',{id:'fake-1',data:'\r\n'+ready});await js(`MT.openProject({slug:'alpha'})`);await delay(100);assert.equal(starts.length,1);assert.equal(writes.length,2);
+ win.webContents.send('pty-exit',{id:'fake-1',code:0});await poll(`!MT.workspace.projects.get('alpha').terminals[0].ptyId`);await js(`MT.openProject({slug:'alpha'})`);assert.equal(starts.length,2);assert.equal(await js(`MT.workspace.projects.get('alpha').terminals.length`),1);
+ picked=other;await js(`MT.workspace.openProject()`);assert.equal(starts.length,3);assert.equal(starts[2].cwd,fs.realpathSync(other));assert.equal(starts[2].kind,agent);
+ cancel=true;await js(`MT.workspace.openProject()`);assert.equal(starts.length,3);cancel=false;
+ win.webContents.send('pty-exit',{id:'fake-3',code:0});await delay(50);fail=true;await js(`MT.workspace.openProject()`);assert.equal(starts.length,4);assert.equal(await js(`MT.workspace.projects.get(MT.workspace.activeId).terminals[0].status`),'exited');assert.equal(await js(`MT.workspace.projects.get(MT.workspace.activeId).terminals.length`),1);
+ fail=false;await js(`MT.workspace.openProject()`);assert.equal(starts.length,5);assert.equal(await js(`MT.workspace.projects.get(MT.workspace.activeId).terminals.length`),1);
+ assert.deepEqual(errors,[]);console.log(JSON.stringify({ok:true,agent,restoreNoReplay:true,autoStart:true,selectedAgent:true,projectCwd:true,trustGate:true,commandOnce:true,separateEnter:true,duplicateGuard:true,reuseLive:true,restartExited:true,folderAutoStart:true,pickerCancel:true,retryFailure:true,errors}));
+ for(let i=1;i<=5;i++)win.webContents.send('pty-exit',{id:'fake-'+i,code:0});await delay(50);app.quit();
+}).catch(e=>{console.error(e);app.exit(1);});

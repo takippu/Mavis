@@ -9,7 +9,7 @@ test('native Mavis autorun explicitly selects the globally installed skill', () 
 });
 
 test('ptyCommand wraps the .cmd shim exactly like claude does', () => {
-  const c = codex.ptyCommand({ binPath: 'C:/npm/codex.cmd', permissionMode: 'default' });
+  const c = codex.ptyCommand({ platform: 'win32', binPath: 'C:/npm/codex.cmd', permissionMode: 'default' });
   assert.match(c.file, /cmd\.exe$/i);
   assert.deepStrictEqual(c.args.slice(0, 2), ['/c', 'C:/npm/codex.cmd']);
   assert.strictEqual(c.args[2], '--no-daemon');

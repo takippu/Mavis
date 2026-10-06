@@ -105,7 +105,7 @@
       left.appendChild(el('div', 'mt-page-title', d.name));
       titleRow.appendChild(left);
       if (d.dir) {
-        const open = el('button', 'mt-pill', 'Open session');
+        const open = el('button', 'mt-pill', 'Open Project');
         open.addEventListener('click', () => onOpen({ cwd: d.dir, label: d.name }));
         titleRow.appendChild(open);
       }

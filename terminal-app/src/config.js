@@ -45,7 +45,7 @@ function compute(userDataDir) {
     const builtin = harnessRegistry.get(harnessRegistry.normalizeId(harness)).autorunCommand;
     const configured = pick('autorunCommand', 'MAVIS_AUTORUN_COMMAND', null);
     if (configured === null) return builtin;
-    const s = String(configured);
+    const s = String(configured); if (!s.trim()) return builtin;
     return builtinAutorun.has(s) ? builtin : s;
   };
   return {

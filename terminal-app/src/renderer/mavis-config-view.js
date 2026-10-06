@@ -250,13 +250,13 @@
         items.forEach((it) => {
           if (c.control === 'chips') {
             const ch = el('button', 'mt-chip' + (it.on ? ' on' : '')); ch.type = 'button'; ch.textContent = it.text.replace(/\*\*/g, '');
-            ch.addEventListener('click', () => { it.on = !it.on; ch.classList.toggle('on', it.on); });
+            ch.setAttribute('aria-pressed', String(it.on)); ch.addEventListener('click', () => { it.on = !it.on; ch.classList.toggle('on', it.on); ch.setAttribute('aria-pressed', String(it.on)); });
             list.appendChild(ch);
           } else {
-            const rowEl = el('label', 'mt-check'); const sw = el('span', 'mt-sw' + (it.on ? ' on' : ''));
+            const rowEl = el('label', 'mt-check'); const sw = el('input'); sw.type = 'checkbox'; sw.checked = it.on;
             const lbl = el('span', 'mt-check-lbl'); if (MT.md) MT.md.inline(it.text, lbl); else lbl.textContent = it.text;
             rowEl.appendChild(sw); rowEl.appendChild(lbl);
-            rowEl.addEventListener('click', (e) => { e.preventDefault(); it.on = !it.on; sw.classList.toggle('on', it.on); });
+            sw.addEventListener('change', () => { it.on = sw.checked; });
             list.appendChild(rowEl);
           }
         });
@@ -267,7 +267,7 @@
 
       function renderEditAddChip(list, it) {
         const ch = el('button', 'mt-chip on'); ch.type = 'button'; ch.textContent = it.text.replace(/\*\*/g, '');
-        ch.addEventListener('click', () => { it.on = !it.on; ch.classList.toggle('on', it.on); });
+        ch.setAttribute('aria-pressed', String(it.on)); ch.addEventListener('click', () => { it.on = !it.on; ch.classList.toggle('on', it.on); ch.setAttribute('aria-pressed', String(it.on)); });
         list.insertBefore(ch, list.lastChild);
       }
 

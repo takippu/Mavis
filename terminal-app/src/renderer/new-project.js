@@ -13,20 +13,40 @@
   const joinPath = (root, slug) => { if (!root || !slug) return ''; const sep = root.includes('\\') ? '\\' : '/'; return root.replace(/[\\/]+$/, '') + sep + slug; };
 
   let overlay = null;
-  function close() { if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay); overlay = null; document.removeEventListener('keydown', onKey, true); }
-  function onKey(e) { if (e.key === 'Escape') { e.stopPropagation(); close(); } }
+  let opening = 0, previousFocus, appWasInert = false;
+  function close() {
+    opening++;
+    document.querySelectorAll('.mt-np-overlay').forEach(node => node.remove());
+    overlay = null; document.removeEventListener('keydown', onKey, true);
+    const app = document.getElementById('app'); if (app) app.inert = appWasInert;
+    previousFocus?.focus?.();
+  }
+  function onKey(e) {
+    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); }
+    else if (e.key === 'Tab' && overlay) {
+      const nodes = [...overlay.querySelectorAll('button:not(:disabled),input:not(:disabled),[tabindex="0"]')];
+      const i = nodes.indexOf(document.activeElement);
+      if (e.shiftKey && i <= 0) { e.preventDefault(); nodes.at(-1)?.focus(); }
+      else if (!e.shiftKey && (i < 0 || i === nodes.length - 1)) { e.preventDefault(); nodes[0]?.focus(); }
+    }
+  }
 
   MT.newProject = {
     async open(onDone) {
       close();
+      const attempt = opening;
       const root = await window.mavis.projectsRoot().catch(() => '');
+      if (attempt !== opening) return;
+      previousFocus = document.activeElement;
+      const app = document.getElementById('app'); appWasInert = !!app?.inert; if (app) app.inert = true;
 
       overlay = el('div', 'mt-np-overlay');
       const card = el('div', 'mt-np-card');
+      card.setAttribute('role', 'dialog'); card.setAttribute('aria-modal', 'true'); card.setAttribute('aria-label', 'New project');
       overlay.appendChild(card);
       overlay.addEventListener('pointerdown', (e) => { if (e.target === overlay) close(); });
       document.body.appendChild(overlay);
-      setTimeout(() => document.addEventListener('keydown', onKey, true), 0);
+      document.addEventListener('keydown', onKey, true);
 
       const st = {
         mode: 'new', name: '', nameEdited: false, type: 'tool', description: '', tags: '',
@@ -50,7 +70,7 @@
       const body = el('div', 'mt-np-body'); card.appendChild(body);
       const foot = el('div', 'mt-np-foot'); card.appendChild(foot);
 
-      const field = (label, control) => { const f = el('div', 'mt-field'); f.append(el('label', 'mt-field-label', label), control); return f; };
+      const field = (label, control) => { const f = el('div', 'mt-field'); const caption = el('label', 'mt-field-label', label); const target = control.matches('input,textarea,select,[role=combobox]') ? control : control.querySelector('input,textarea,select,[role=combobox]'); if (target) { target.id ||= 'project-' + Math.random().toString(36).slice(2); caption.htmlFor = target.id; target.setAttribute('aria-label', label); } f.append(caption, control); return f; };
       const textInput = (val, ph, type) => { const i = el('input', 'mt-field-input'); i.type = type || 'text'; i.value = val || ''; if (ph) i.placeholder = ph; return i; };
 
       let pathInput = null, nameInput = null, slugHint = null, gitDetect = null;
@@ -83,17 +103,17 @@
         // Type
         const type = MT.dropdown.create({ options: TYPES.map((t) => ({ value: t, label: t })), value: st.type, className: 'mt-field-input', ariaLabel: 'Type' });
         type.addEventListener('change', () => { st.type = type.value; });
-        body.appendChild(field('Type', type));
+        const advanced = el('details', 'ws-project-advanced'); advanced.appendChild(el('summary', '', 'Project details (optional)')); body.appendChild(advanced); advanced.appendChild(field('Type', type));
 
         // Description
         const desc = textInput(st.description, 'One-line description');
         desc.addEventListener('input', () => { st.description = desc.value; });
-        body.appendChild(field('Description', desc));
+        advanced.appendChild(field('Description', desc));
 
         // Tags
         const tags = textInput(st.tags, 'comma, separated, tags');
         tags.addEventListener('input', () => { st.tags = tags.value; });
-        body.appendChild(field('Tags', tags));
+        advanced.appendChild(field('Tags', tags));
 
         // Folder + Browse
         pathInput = textInput(st.path, st.mode === 'existing' ? 'Browse to an existing folder' : '<root>\\<slug>');
@@ -164,7 +184,7 @@
 
       function showFormFooter() {
         foot.innerHTML = '';
-        const cancel = el('button', 'mt-link', 'Cancel'); cancel.addEventListener('click', close);
+        const cancel = el('button', 'mt-link', 'Cancel'); cancel.type = 'button'; cancel.addEventListener('click', close);
         const review = el('button', 'mt-pill', 'Review & create');
         const status = el('span', 'mt-np-status'); status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
         review.addEventListener('click', () => doReview(status));
@@ -223,6 +243,7 @@
       segNew.addEventListener('click', () => setMode('new'));
       segEx.addEventListener('click', () => setMode('existing'));
       setMode('new');
+      nameInput?.focus();
     },
   };
 })();

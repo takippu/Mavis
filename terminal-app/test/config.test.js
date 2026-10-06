@@ -65,6 +65,18 @@ test('the mirror case is ignored too: claude built-in pinned while harness is co
   fs.rmSync(d, { recursive: true, force: true });
 });
 
+test('blank autorun settings use each harness Mavis skill command', () => {
+  const d = tmp();
+  try {
+    for (const autorunCommand of ['', '   ']) {
+      fs.writeFileSync(path.join(d, 'settings.json'), JSON.stringify({ harness: 'codex', autorunCommand }));
+      const c = config.load(d);
+      assert.strictEqual(c.autorunCommandForHarness('codex'), '$mavis');
+      assert.strictEqual(c.autorunCommandForHarness('claude'), '/mavis');
+    }
+  } finally { fs.rmSync(d, { recursive: true, force: true }); }
+});
+
 test('the deprecated Codex prompt setting migrates to native $mavis', () => {
   const d = tmp();
   fs.writeFileSync(path.join(d, 'settings.json'), JSON.stringify({ harness: 'codex', autorunCommand: '/prompts:mavis' }));

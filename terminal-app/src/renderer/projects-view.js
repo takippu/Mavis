@@ -49,7 +49,7 @@
       closeSwatchPop();
       let res = null;
       try { res = await window.mavis.setProjectColor(p.slug, color || ''); } catch { res = { ok: false }; }
-      if (res && res.ok) { p.color = color || null; paintSwatch(sw, p.color); const card = sw.closest('.mt-proj'); if (card) tintCard(card, p.color); }
+      if (res && res.ok) { p.color = color || null; paintSwatch(sw, p.color); const card = sw.closest('.mt-proj'); if (card) tintCard(card, p.color); window.dispatchEvent(new CustomEvent('mavis-project-color', { detail: { slug: p.slug, color: p.color } })); }
     };
     const none = el('button', 'mt-swatch-opt none');
     none.type = 'button'; none.title = 'No colour'; none.setAttribute('aria-label', 'Clear colour');
@@ -119,10 +119,10 @@
     if (p.slug) {
       const info = el('button', 'mt-info-btn');
       info.type = 'button';
-      info.title = 'Details';
-      info.setAttribute('aria-label', 'Details for ' + (p.name || 'project'));
-      if (MT.icons) info.innerHTML = MT.icons.svg('info', 16);
-      info.addEventListener('click', (e) => { e.stopPropagation(); MT.router.show('detail', p.slug); });
+      info.title = 'Project actions';
+      info.setAttribute('aria-label', 'Actions for project ' + (p.name || 'project'));
+      if (MT.icons) info.innerHTML = MT.icons.svg('more', 16);
+      info.addEventListener('click', (e) => { e.stopPropagation(); MT.projectActions(info, p); });
       right.appendChild(info);
     }
     head.appendChild(right);
@@ -137,14 +137,15 @@
       card.appendChild(m);
     }
 
-    if (p.dir) {
-      const fire = () => onOpen({ cwd: p.dir, label: p.name, color: p.color || null });
+    if (p.dir || p.slug) {
+      const fire = () => onOpen({ slug: p.slug, cwd: p.dir, label: p.name, color: p.color || null });
       card.title = 'Open ' + (p.name || 'project');
       card.setAttribute('role', 'button');
       card.setAttribute('tabindex', '0');
       card.setAttribute('aria-label', 'Open ' + (p.name || 'project'));
       card.addEventListener('click', fire);
       card.addEventListener('keydown', (e) => { if (e.target !== card) return; if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fire(); } });
+      if (!p.dir) card.appendChild(el('div', 'mt-proj-path', 'Choose a local folder to open'));
     } else {
       card.style.cursor = 'default';
     }
@@ -164,7 +165,7 @@
   }
 
   MT.projects = {
-    async render(host, onOpen) {
+    async render(host, onOpen, opts = {}) {
       host.innerHTML = '';
       let list = [];
       try { list = await window.mavis.listProjects(); } catch { /* empty */ }
@@ -172,9 +173,11 @@
 
       // header: serif title + search
       const header = el('div');
+      header.className = 'ws-project-header';
       header.style.display = 'flex';
       header.style.justifyContent = 'space-between';
-      header.style.alignItems = 'flex-end';
+      header.style.alignItems = 'center';
+      header.style.flexWrap = 'wrap';
       header.style.gap = '16px';
       header.style.marginBottom = '16px';
       header.appendChild(el('div', 'mt-page-title', 'Projects'));
@@ -190,10 +193,15 @@
 
       // right group: "New project" + search
       const right = el('div', 'mt-proj-headright');
+      if (opts.onOpenFolder) {
+        const openBtn = el('button', 'ws-button'); openBtn.type = 'button';
+        openBtn.innerHTML = (MT.icons ? MT.icons.svg('folder', 16) : '') + '<span>Open Folder…</span>';
+        openBtn.addEventListener('click', opts.onOpenFolder); right.appendChild(openBtn);
+      }
       const newBtn = el('button', 'mt-pill mt-proj-new');
       newBtn.type = 'button';
       newBtn.innerHTML = (MT.icons ? MT.icons.svg('plus', 15) : '') + '<span>New project</span>';
-      newBtn.addEventListener('click', () => { if (MT.newProject) MT.newProject.open(() => MT.projects.render(host, onOpen)); });
+      newBtn.addEventListener('click', () => { if (MT.newProject) MT.newProject.open(() => MT.projects.render(host, onOpen, opts)); });
       right.append(newBtn, search);
       header.appendChild(right);
       host.appendChild(header);

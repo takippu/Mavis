@@ -465,7 +465,7 @@ test('the real electron binary + ELECTRON_RUN_AS_NODE runs brain-repair.mjs to c
     const res = await new Promise((resolve) => {
       const child = execFile(
         electronPath,
-        [REPAIR_SCRIPT, 'rotate', 'demo', '--dry-run', '--json'],
+        [REPAIR_SCRIPT, 'rotate', 'demo', '--brain-root=' + root, '--dry-run', '--json'],
         {
           cwd: root,
           windowsHide: true,
@@ -487,4 +487,25 @@ test('the real electron binary + ELECTRON_RUN_AS_NODE runs brain-repair.mjs to c
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
+});
+
+test('Electron lint JSON drains fully beyond a pipe buffer', async (t) => {
+  let electronPath;
+  try { electronPath = require('electron'); } catch { return t.skip('electron not installed'); }
+  const links = Array.from({ length: 80 }, (_, i) => `[missing-${i}](missing-${i}.md)`).join('\n');
+  const root = tmpBrain({ 'projects/demo/notes.md': links });
+  try {
+    const { promisify } = require('node:util');
+    const { execFile } = require('node:child_process');
+    const { stdout } = await promisify(execFile)(electronPath,
+      [scriptIn(root), '--json', '--brain-root', root],
+      { env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' }, maxBuffer: 1024 * 1024 }
+    ).catch((error) => {
+      if (error.code === 1 && error.stdout) return { stdout: error.stdout };
+      throw error;
+    });
+    assert.ok(Buffer.byteLength(stdout) > 8192, 'regression fixture exceeds a pipe buffer');
+    const report = JSON.parse(stdout);
+    assert.ok(report.counts.fail >= 80);
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });

@@ -3,6 +3,12 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('mavis', {
+  platform: process.platform,
+  workspace: (action, payload) => ipcRenderer.invoke('workspace:' + action, payload),
+  onWorkspaceChanged: cb => ipcRenderer.on('workspace:changed', (_e, p) => cb(p)),
+  onCommand: cb => ipcRenderer.on('workspace:command', (_e, p) => cb(p)),
+  onCloseRequest: cb => ipcRenderer.on('workspace:close-request', (_e, p) => cb(p)),
+  closeApproved: () => ipcRenderer.send('workspace:close-approved'),
   // sessions
   createSession: (opts) => ipcRenderer.invoke('create-session', opts),
   // ids of harnesses actually installed on this machine (e.g. ['claude'] or ['claude','codex']) —

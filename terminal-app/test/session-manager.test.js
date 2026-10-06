@@ -189,3 +189,18 @@ test('autorun writes the command, then a SEPARATE Enter after the settle', (t) =
   t.mock.timers.tick(200);
   assert.deepStrictEqual(terms[0].written, ['/mavis bb', '\r']); // Enter sent on its own
 });
+
+test('shutdown waits for native exits, including a previously closed pane', async () => {
+  const exits = [];
+  const m = new SessionManager({ spawnShell: ({ onExit }) => {
+    exits.push(onExit);
+    return { ok: true, term: { kill() {}, write() {}, resize() {} } };
+  } });
+  const a = m.create({ kind: 'shell' }); m.create({ kind: 'shell' });
+  m.close(a.id);
+  let finished = false;
+  const done = m.shutdown().then(() => { finished = true; });
+  await Promise.resolve(); assert.equal(finished, false);
+  exits[1](0); await Promise.resolve(); assert.equal(finished, false);
+  exits[0](0); await done; assert.equal(finished, true);
+});

@@ -10,18 +10,19 @@
   MT.confirm = function (opts) {
     const o = typeof opts === 'string' ? { message: opts } : (opts || {});
     return new Promise((resolve) => {
+      const previous = document.activeElement, background = document.getElementById('app'), wasInert = background?.inert; if (background) background.inert = true;
       const overlay = el('div', 'mt-confirm-overlay');
       const card = el('div', 'mt-confirm');
-      card.setAttribute('role', 'alertdialog'); card.setAttribute('aria-modal', 'true');
+      card.setAttribute('role', 'alertdialog'); card.setAttribute('aria-modal', 'true'); card.setAttribute('aria-label', o.title || 'Confirm action');
       if (o.title) card.appendChild(el('div', 'mt-confirm-title', o.title));
       card.appendChild(el('div', 'mt-confirm-msg', o.message || 'Are you sure?'));
       const row = el('div', 'mt-confirm-actions');
       const cancel = el('button', 'mt-confirm-btn', o.cancelLabel || 'Cancel'); cancel.type = 'button';
       const ok = el('button', 'mt-confirm-btn ' + (o.danger === false ? 'primary' : 'danger'), o.okLabel || 'Close'); ok.type = 'button';
-      const finish = (v) => { document.removeEventListener('keydown', onKey, true); if (overlay.parentNode) overlay.parentNode.removeChild(overlay); resolve(v); };
+      const finish = (v) => { document.removeEventListener('keydown', onKey, true); if (overlay.parentNode) overlay.parentNode.removeChild(overlay); if (background) background.inert = wasInert; previous?.focus?.(); resolve(v); };
       const onKey = (e) => {
         if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); finish(false); }
-        else if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); finish(true); }
+        else if (e.key === 'Tab') { e.preventDefault(); (document.activeElement === cancel ? ok : cancel).focus(); }
       };
       cancel.addEventListener('click', () => finish(false));
       ok.addEventListener('click', () => finish(true));
@@ -31,7 +32,7 @@
       overlay.addEventListener('pointerdown', (e) => { if (e.target === overlay) finish(false); }); // backdrop click cancels
       document.addEventListener('keydown', onKey, true);
       document.body.appendChild(overlay);
-      requestAnimationFrame(() => { overlay.classList.add('in'); ok.focus(); });
+      requestAnimationFrame(() => { overlay.classList.add('in'); cancel.focus(); });
     });
   };
 })();

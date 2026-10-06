@@ -470,7 +470,17 @@ async function checkout(root, name) {
   return r.error ? { error: r.error } : { ok: true };
 }
 
+async function fileVersions(root, rel, staged) {
+  const safe = safeRel(root, rel); if (!safe) return { error: 'Invalid path' };
+  const original = await run(root, ['show', (staged ? 'HEAD:' : ':') + safe]);
+  let modified;
+  if (staged) { const r = await run(root, ['show', ':' + safe]); modified = r.error ? '' : r.out; }
+  else { try { const r = await require('./fs-browser').readFile(root, safe); if (r.binary || r.tooLarge) return { unsupported: true }; modified = r.text; } catch { modified = ''; } }
+  return { original: original.error ? '' : original.out, modified };
+}
+
 module.exports = {
+  fileVersions,
   resolveRepo, status, diffFile, searchChanges, stage, unstage, discard, commit, push, branches, checkout,
   safeRel, MAX_DIFF_ROWS,
   _searchDiff, MAX_SEARCH_RESULTS,

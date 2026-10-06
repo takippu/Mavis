@@ -5,7 +5,7 @@ const assert = require('node:assert');
 const claude = require('../src/harness/claude');
 
 test('ptyCommand wraps a .cmd shim through the shell', () => {
-  const c = claude.ptyCommand({ binPath: 'C:/npm/claude.cmd', permissionMode: 'default' });
+  const c = claude.ptyCommand({ platform: 'win32', binPath: 'C:/npm/claude.cmd', permissionMode: 'default' });
   assert.match(c.file, /cmd\.exe$/i);
   assert.deepStrictEqual(c.args.slice(0, 2), ['/c', 'C:/npm/claude.cmd']);
 });
@@ -52,7 +52,7 @@ test('headlessCommand carries NO permission flag, unlike ptyCommand (Finding 1, 
 });
 
 test('headlessCommand wraps a .cmd shim through the shell exactly like ptyCommand does', () => {
-  const h = claude.headlessCommand({ binPath: 'C:/npm/claude.cmd' });
+  const h = claude.headlessCommand({ platform: 'win32', binPath: 'C:/npm/claude.cmd' });
   assert.match(h.file, /cmd\.exe$/i);
   assert.deepStrictEqual(h.args, ['/c', 'C:/npm/claude.cmd']);
 });

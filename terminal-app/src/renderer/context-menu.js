@@ -21,6 +21,7 @@
 
   function show(x, y, items) {
     close();
+    const previous = document.activeElement;
     const menu = document.createElement('div');
     menu.className = 'mt-ctx-menu';
     menu.setAttribute('role', 'menu');
@@ -53,7 +54,8 @@
     openEl = menu;
 
     const onDocDown = (e) => { if (openEl && !openEl.contains(e.target)) close(); };
-    const onKey = (e) => { if (e.key === 'Escape') { e.stopImmediatePropagation(); close(); } };
+    const onKey = (e) => { const nodes = [...menu.querySelectorAll('button:not(:disabled)')]; const index = nodes.indexOf(document.activeElement); if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); close(); previous?.focus?.(); } else if (['ArrowDown','ArrowUp','Home','End'].includes(e.key)) { e.preventDefault(); nodes[e.key === 'Home' ? 0 : e.key === 'End' ? nodes.length - 1 : (index + (e.key === 'ArrowDown' ? 1 : nodes.length - 1)) % nodes.length]?.focus(); } else if (e.key === 'Tab') { close(); previous?.focus?.(); } };
+    menu.querySelector('button:not(:disabled)')?.focus();
     const onAway = () => close();
     // defer wiring so the same click that opened the menu doesn't immediately close it
     setTimeout(() => {

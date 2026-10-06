@@ -24,9 +24,10 @@
   }
 
   function modal(titleText) {
+    const previous = document.activeElement, background = document.getElementById('app'), wasInert = background?.inert; if (background) background.inert = true;
     const overlay = el('div', 'mt-np-overlay');
     const card = el('div', 'mt-np-card');
-    overlay.appendChild(card);
+    card.setAttribute('role', 'dialog'); card.setAttribute('aria-modal', 'true'); card.setAttribute('aria-label', titleText); overlay.appendChild(card);
     const head = el('div', 'mt-np-head');
     head.appendChild(el('div', 'mt-np-title', titleText));
     const x = el('button', 'mt-np-x'); x.type = 'button'; x.setAttribute('aria-label', 'Close'); x.innerHTML = icon('close', 16);
@@ -34,20 +35,22 @@
     const body = el('div', 'mt-np-body'); card.appendChild(body);
     const foot = el('div', 'mt-np-foot'); card.appendChild(foot);
 
+    let busy = false;
     function close() {
+      if (busy) return;
       if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
-      document.removeEventListener('keydown', onKey, true);
+      document.removeEventListener('keydown', onKey, true); if (background) background.inert = wasInert; previous?.focus?.();
     }
-    function onKey(e) { if (e.key === 'Escape') { e.stopPropagation(); close(); } }
+    function onKey(e) { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); } else if (e.key === 'Tab') { const nodes = [...card.querySelectorAll('button:not(:disabled),input,textarea,select,[tabindex="0"]')]; const index = nodes.indexOf(document.activeElement); if (e.shiftKey && index <= 0) { e.preventDefault(); nodes.at(-1)?.focus(); } else if (!e.shiftKey && index === nodes.length - 1) { e.preventDefault(); nodes[0]?.focus(); } } }
     overlay.addEventListener('pointerdown', (e) => { if (e.target === overlay) close(); });
     x.addEventListener('click', close);
     document.body.appendChild(overlay);
-    setTimeout(() => document.addEventListener('keydown', onKey, true), 0);
-    return { overlay, card, body, foot, close };
+    document.addEventListener('keydown', onKey, true); requestAnimationFrame(() => card.querySelector('input,textarea,button')?.focus());
+    return { overlay, card, body, foot, close, setBusy(value) { busy = value; x.disabled = value; } };
   }
 
   function field(parent, label, control) {
-    parent.appendChild(el('label', 'mt-field-label', label));
+    control.id ||= 'entry-' + Math.random().toString(36).slice(2); const caption = el('label', 'mt-field-label', label); caption.htmlFor = control.id; control.setAttribute('aria-label', label); parent.appendChild(caption);
     parent.appendChild(control);
     return control;
   }
@@ -156,7 +159,7 @@
       };
     }
 
-    const status = el('span', 'mt-do-form-status');
+    const status = el('span', 'mt-do-form-status'); status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
     const primary = el('button', 'mt-pill', 'Preview changes'); primary.type = 'button';
     m.foot.appendChild(status); m.foot.appendChild(primary);
 
@@ -166,6 +169,7 @@
       if (built.error) { status.textContent = built.error; return; }
       status.textContent = 'Composing…'; primary.disabled = true;
       const pv = await preview(built);
+      if (!m.overlay.isConnected) return;
       primary.disabled = false;
       if (!pv || !pv.ok) { status.textContent = (pv && pv.error) || 'Preview failed.'; return; }
       status.textContent = '';
@@ -175,13 +179,13 @@
       const hasChange = renderDiff(diffHost, pv);
       // swap the footer to Save / Back
       m.foot.innerHTML = '';
-      const s2 = el('span', 'mt-do-form-status'); m.foot.appendChild(s2);
+      const s2 = el('span', 'mt-do-form-status'); s2.setAttribute('role', 'status'); s2.setAttribute('aria-live', 'polite'); m.foot.appendChild(s2);
       const back = el('button', 'mt-pill mt-pill-ghost', 'Back'); back.type = 'button';
       back.addEventListener('click', () => { diffHost.remove(); form.style.display = ''; m.foot.innerHTML = ''; m.foot.appendChild(status); m.foot.appendChild(primary); status.textContent = ''; });
       const save = el('button', 'mt-pill', 'Save to brain'); save.type = 'button'; save.disabled = !hasChange;
       save.addEventListener('click', async () => {
-        s2.textContent = 'Saving…'; save.disabled = true;
-        const r = await commit(built);
+        s2.textContent = 'Saving…'; save.disabled = true; back.disabled = true; m.setBusy(true);
+        const r = await commit(built); m.setBusy(false); back.disabled = false;
         if (!r || !r.ok) { s2.textContent = (r && r.error) || 'Save failed.'; save.disabled = false; return; }
         m.close();
         if (typeof opts.onSaved === 'function') opts.onSaved(built);

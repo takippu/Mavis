@@ -5,7 +5,7 @@
 // below the core form (integrations registers PM token + Map controls there).
 (function () {
   const MT = (window.MT = window.MT || {});
-  const sections = [];
+  const sections = []; const drafts = {}; let saving = false;
 
   function el(tag, cls, text) {
     const n = document.createElement(tag);
@@ -30,8 +30,9 @@
 
       let data;
       try { data = await window.mavis.getSettings(); } catch { data = null; }
-      const schema = (data && data.schema) || {};
-      const values = (data && data.values) || {};
+      if (!data || data.error) { host.appendChild(el('p', '', 'Could not load settings.')); const retry = el('button', 'mt-btn', 'Retry'); retry.onclick = () => MT.settings.render(host); host.appendChild(retry); return; }
+      const schema = data.schema || {};
+      const baseline = data.values || {}; const values = { ...baseline, ...drafts };
 
       // Never offer a harness that is not installed — a dead dropdown entry that spawns nothing is
       // worse than no choice at all. Fetched ONCE, up front (render() is already async and this is
@@ -47,7 +48,8 @@
       card.style.marginTop = '16px';
 
       const form = el('div', 'mt-settings-form');
-      const inputs = {};
+      const inputs = {}; const groups = new Map();
+      const groupFor = key => ['appTheme','terminalFontSize'].includes(key) ? 'Appearance & Editor' : /^(harness|permissionMode|autorun)/.test(key) ? 'Agents & Terminal' : /^(notify|dailyOps)/.test(key) ? 'Notifications & Daily Ops' : 'Projects & Integrations';
       for (const key in schema) {
         const s = schema[key];
         // Single-harness machine (the common case today): skip the row entirely rather than show a
@@ -88,7 +90,7 @@
         } else if (Array.isArray(s.enum)) {
           // harness: only offer ids actually installed (already guaranteed >= 2 here, or the row
           // was skipped above); every other enum field is unaffected.
-          const enumValues = key === 'harness' ? s.enum.filter((opt) => harnessInstalled.includes(opt)) : s.enum;
+          const enumValues = key === 'harness' ? s.enum.filter((opt) => harnessInstalled.includes(opt)) : key === 'appTheme' ? s.enum.filter(opt => ['system','light','dark'].includes(opt) || opt === values[key]) : s.enum;
           const ddOpts = enumValues.map((opt) => ({ value: opt, label: (s.enumLabels && s.enumLabels[opt]) || opt }));
           input = MT.dropdown.create({ options: ddOpts, value: values[key], className: 'mt-field-input', ariaLabel: s.label || key });
           // live preview: app theme applies on change; Save persists it (only-save-on-Save)
@@ -107,31 +109,38 @@
         input.value = values[key] != null ? values[key] : '';
         field.appendChild(input);
         inputs[key] = input;
-        form.appendChild(field);
+        input.addEventListener('input', () => { drafts[key] = input.value; refresh(); }); input.addEventListener('change', () => { drafts[key] = input.value; refresh(); }); if (s.type === 'weekdays') input.addEventListener('click', () => { drafts[key] = input.value; refresh(); });
+        const name = groupFor(key); if (!groups.has(name)) { const section = el('section', 'ws-settings-section'); section.appendChild(el('h3', '', name)); groups.set(name, section); form.appendChild(section); } groups.get(name).appendChild(field);
       }
+      for (const name of ['Appearance & Editor','Agents & Terminal','Notifications & Daily Ops','Projects & Integrations']) if (groups.has(name)) form.appendChild(groups.get(name));
       card.appendChild(form);
 
       const actions = el('div');
       actions.style.cssText = 'display:flex;gap:12px;align-items:center;margin-top:16px';
-      const save = el('button', 'mt-pill', 'Save');
+      const save = el('button', 'mt-pill', 'Save Settings'); save.type = 'button';
       const status = el('span');
       status.style.cssText = 'color:var(--color-graphite);font-size:13px';
+      status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
+      function refresh() { const dirty = Object.keys(inputs).some(key => String(inputs[key].value) !== String(baseline[key] ?? '')); save.disabled = saving || !dirty; status.textContent = saving ? 'Saving…' : dirty ? 'Unsaved settings · previews are temporary until saved' : ''; }
+      refresh();
       save.addEventListener('click', async () => {
+        if (saving) return; saving = true; refresh();
         const patch = {};
-        for (const k in inputs) patch[k] = inputs[k].value;
+        for (const k in inputs) if (String(inputs[k].value) !== String(baseline[k] ?? '')) patch[k] = inputs[k].value;
         try {
           const r = await window.mavis.setSettings(patch);
           if (r && r.ok) {
-            status.textContent = 'Saved';
+            for (const k in patch) { baseline[k] = r.values?.[k] ?? patch[k]; if (String(inputs[k].value) === String(patch[k])) { inputs[k].value = baseline[k]; delete drafts[k]; } }
+            status.textContent = 'Settings saved';
             if (MT.theme && MT.theme.apply && patch.appTheme) MT.theme.apply(patch.appTheme, { animate: true });
-            if (MT.session && MT.session.applyTerminalSettings) MT.session.applyTerminalSettings({ fontSize: Number(patch.terminalFontSize) });
+            if (patch.terminalFontSize != null && MT.session && MT.session.applyTerminalSettings) MT.session.applyTerminalSettings({ fontSize: Number(baseline.terminalFontSize) });
             if (MT.notify && MT.notify.configure) MT.notify.configure({ mode: patch.notifyOnComplete, sound: patch.notifySound, volume: patch.notifyVolume });
           } else {
-            status.textContent = 'Save failed';
+            status.textContent = 'Save failed. Your edits are retained; try again.';
           }
         } catch {
-          status.textContent = 'Save failed';
-        }
+          status.textContent = 'Save failed. Your edits are retained; try again.';
+        } finally { saving = false; save.disabled = !Object.keys(inputs).some(key => String(inputs[key].value) !== String(baseline[key] ?? '')); }
       });
       actions.appendChild(save);
       actions.appendChild(status);

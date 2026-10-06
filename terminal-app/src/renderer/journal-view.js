@@ -85,10 +85,11 @@
   let renderGen = 0;
 
   MT.journal = {
-    async render(host) {
+    async render(host, opts = {}) {
+      const tabs = opts.characterOnly ? TAB_DEFS.slice(0, 1) : TAB_DEFS;
       const myGen = ++renderGen;
       host.innerHTML = '';
-      host.appendChild(el('div', 'mt-page-title', 'Journal'));
+      host.appendChild(el('div', 'mt-page-title', opts.characterOnly ? 'Character' : 'Journal'));
 
       // preferences power the only live tab — load eagerly so the router's settle
       // promise reflects real content (the whole view re-renders on brain-changed).
@@ -109,6 +110,7 @@
       const strip = el('div', 'mt-jtabs'); strip.setAttribute('role', 'tablist'); strip.setAttribute('aria-label', 'Journal sections');
       const body = el('div', 'mt-jbody'); body.setAttribute('role', 'tabpanel');
       card.appendChild(strip); card.appendChild(body);
+      if (opts.characterOnly) strip.hidden = true;
       host.appendChild(card);
 
       let activeTab = 'character';
@@ -125,13 +127,13 @@
         else buildPlaceholder(body, labelFor(key));
       }
 
-      TAB_DEFS.forEach(([key, label], idx) => {
+      tabs.forEach(([key, label], idx) => {
         const b = el('button', 'mt-jtab' + (key === activeTab ? ' on' : '')); b.type = 'button'; b.textContent = label;
         b.setAttribute('role', 'tab'); b.setAttribute('aria-selected', key === activeTab ? 'true' : 'false'); b.tabIndex = key === activeTab ? 0 : -1;
         b.addEventListener('click', () => selectTab(key));
         b.addEventListener('keydown', (e) => {
-          if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); const n = TAB_DEFS[(idx + 1) % TAB_DEFS.length][0]; selectTab(n); tabBtns[n].focus(); }
-          else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); const n = TAB_DEFS[(idx - 1 + TAB_DEFS.length) % TAB_DEFS.length][0]; selectTab(n); tabBtns[n].focus(); }
+          if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); const n = tabs[(idx + 1) % tabs.length][0]; selectTab(n); tabBtns[n].focus(); }
+          else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); const n = tabs[(idx - 1 + tabs.length) % tabs.length][0]; selectTab(n); tabBtns[n].focus(); }
         });
         tabBtns[key] = b; strip.appendChild(b);
       });
@@ -507,7 +509,7 @@
 
           // Inventory bags — compact clickable buttons (whole bag is the button)
           const bagsCol = el('div', 'mt-hub-inv');
-          bagsCol.appendChild(el('div', 'mt-sect-lab', 'Inventory'));
+          bagsCol.appendChild(el('div', 'mt-sect-lab', 'Profile & memory'));
           const bags = el('div', 'mt-hub-bags');
           const makeBag = (label, iconName, count, onOpen) => {
             const b = el('button', 'mt-hub-bag'); b.type = 'button'; b.setAttribute('aria-label', 'Open ' + label);
