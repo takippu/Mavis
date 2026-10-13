@@ -1,12 +1,17 @@
 'use strict';
 
-const { app, BrowserWindow, ipcMain, shell, Notification, dialog, clipboard, Menu, screen } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, Notification, dialog, clipboard, Menu, screen, powerMonitor } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { fileURLToPath } = require('url');
 
 require('./mac-environment').restoreMacPath();
 if (!app.isPackaged && process.env.MAVIS_TEST_USER_DATA) app.setPath('userData', process.env.MAVIS_TEST_USER_DATA);
+const hiddenTestRun = require('./test-window-mode').hiddenTestRun(app);
+if (hiddenTestRun && process.platform === 'darwin') {
+  app.setActivationPolicy('accessory');
+  app.dock?.hide();
+}
 
 const config = require('./config');
 const harnessRegistry = require('./harness');
@@ -44,6 +49,9 @@ let workspaces = null;
 let closeApproved = false;
 let quitting = false;
 let stoppingTerminals = false;
+let hunterService = null;
+let hunterStopped = false;
+let hunterQuitPromise = null;
 const notifiedSessions = new Set(); // sessions already alerted this attention episode
 
 function send(channel, payload) {
@@ -139,6 +147,7 @@ function createWindow() {
     frame: process.platform === 'darwin',
     ...(process.platform === 'darwin' ? { titleBarStyle: 'hiddenInset', trafficLightPosition: { x: 16, y: 20 } } : {}),
     show: false,
+    ...(hiddenTestRun ? { focusable: false, skipTaskbar: true } : {}),
     backgroundColor: '#f7f7f8',
     title: 'Mavis-Terminal',
     icon: path.join(__dirname, 'renderer', 'assets', 'mavis-logo.png'),
@@ -161,8 +170,9 @@ function createWindow() {
       backgroundThrottling: false,
     },
   });
+  if (hiddenTestRun) win.webContents.setAudioMuted(true);
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
-  win.once('ready-to-show', () => { win.show(); });
+  win.once('ready-to-show', () => { if (!hiddenTestRun) win.show(); });
   win.on('close', event => { if (!closeApproved) { event.preventDefault(); send('workspace:close-request', { quitting }); } else { require('./window-state').write(userDataDir, win.getNormalBounds()); workspaces?.closeAll(); } });
   // Chromium's default Ctrl+R / Ctrl+Shift+R / F5 reload accelerators are live even with no
   // app menu bar shown (frameless window) — an accidental hit nukes the whole renderer (every
@@ -199,15 +209,20 @@ app.whenReady().then(() => {
   // diagnostics: when MT_DIAG is set, start each run with a fresh log so a single repro is clean.
   if (process.env.MT_DIAG) { try { const f = path.join(app.getPath('temp'), 'mt-diag.log'); fs.writeFileSync(f, ''); console.log('[mt-diag] logging to', f); } catch { /* noop */ } }
   // clicking a toast → bring the main window forward + jump to that session
-  toastWindow.setHandlers({ onActivate: (id) => { try { if (win && !win.isDestroyed()) { win.show(); win.focus(); } } catch { /* noop */ } if (id) send('activate-session', { id }); } });
+  toastWindow.setHandlers({ onActivate: (id) => { try { if (!hiddenTestRun && win && !win.isDestroyed()) { win.show(); win.focus(); } } catch { /* noop */ } if (id) send('activate-session', { id }); } });
   userDataDir = app.getPath('userData');
-  workspaces = require('./workspace-ipc').install({ ipcMain, dialog, shell, clipboard, getWindow: () => win, dir: userDataDir, getProjects: () => listProjectsWithDirs(cfg.BRAIN_ROOT), getSessions: () => sessions, send, autorunFor: (kind, slug) => ({ command: cfg.autorunCommandForHarness(kind) + (slug ? ' ' + slug : ''), enterDelayMs: cfg.AUTORUN_ENTER_DELAY_MS }) });
+  try {
+    hunterService = require('./lead-hunter-service').createHunterService({ dir: userDataDir, powerMonitor, onChange: snapshot => send('workspace:hunter-changed', snapshot) });
+    hunterService.ready.catch(error => console.error('[Discover] recovery failed:', error.message));
+  } catch (error) { console.error('[Discover] unavailable:', error.message); }
+
+  workspaces = require('./workspace-ipc').install({ ipcMain, dialog, shell, clipboard, getWindow: () => win, dir: userDataDir, hunterService, getProjects: () => listProjectsWithDirs(cfg.BRAIN_ROOT), getSessions: () => sessions, send, autorunFor: (kind, slug) => ({ command: cfg.autorunCommandForHarness(kind) + (slug ? ' ' + slug : ''), enterDelayMs: cfg.AUTORUN_ENTER_DELAY_MS }) });
   const command = id => () => send('workspace:command', id);
   Menu.setApplicationMenu(Menu.buildFromTemplate([
     ...(process.platform === 'darwin' ? [{ label: 'Mavis', submenu: [{ role: 'about' }, { type: 'separator' }, { label: 'Settings…', accelerator: 'CmdOrCtrl+,', click: command('settings') }, { role: 'hide' }, { role: 'hideOthers' }, { role: 'unhide' }, { type: 'separator' }, { role: 'quit' }] }] : []),
     { label: 'File', submenu: [{ label: 'Open Folder…', accelerator: 'CmdOrCtrl+O', click: command('open') }, { label: 'Quick Open…', accelerator: 'CmdOrCtrl+P', click: command('quickOpen') }, { type: 'separator' }, { label: 'Save', accelerator: 'CmdOrCtrl+S', click: command('save') }, { label: 'Save All', accelerator: 'CmdOrCtrl+Alt+S', click: command('saveAll') }, { label: 'Save As…', accelerator: 'CmdOrCtrl+Shift+S', click: command('saveAs') }, { type: 'separator' }, { label: 'Close Tab', accelerator: 'CmdOrCtrl+W', click: command('closeResource') }, { label: 'Close Project', click: command('closeProject') }, { label: 'Close Window', accelerator: 'CmdOrCtrl+Shift+W', click: () => win?.close() }] },
     { label: 'Edit', submenu: [{ role: 'undo' }, { role: 'redo' }, { type: 'separator' }, { role: 'cut' }, { role: 'copy' }, { role: 'paste' }, { role: 'selectAll' }, { type: 'separator' }, { label: 'Find', accelerator: 'CmdOrCtrl+F', click: command('find') }, { label: 'Search Project', accelerator: 'CmdOrCtrl+Shift+F', click: command('search') }] },
-    { label: 'View', submenu: [{ label: 'Command Palette', accelerator: 'CmdOrCtrl+Shift+P', click: command('palette') }, { label: 'Toggle Sidebar', accelerator: 'CmdOrCtrl+B', click: command('sidebar') }, { label: 'Toggle Terminal', click: command('terminal') }, { label: 'Toggle Mavis Pane', click: command('inspector') }, { label: 'Split Editor', click: command('splitEditor') }, { role: 'togglefullscreen' }] },
+    { label: 'View', submenu: [{ label: 'Freelance', click: command('freelance') }, { type: 'separator' }, { label: 'Command Palette', accelerator: 'CmdOrCtrl+Shift+P', click: command('palette') }, { label: 'Toggle Sidebar', accelerator: 'CmdOrCtrl+B', click: command('sidebar') }, { label: 'Toggle Terminal', click: command('terminal') }, { label: 'Toggle Mavis Pane', click: command('inspector') }, { label: 'Split Editor', click: command('splitEditor') }, { role: 'togglefullscreen' }] },
     { label: 'Terminal', submenu: ['shell', 'claude', 'codex'].map(kind => ({ label: 'New ' + kind + ' Terminal', click: command(kind) })) }, { role: 'windowMenu' },
   ]));
   // Status sidecar: write the emitter, clear any crash leftovers, and start the reader. Each agent
@@ -305,8 +320,8 @@ app.on('web-contents-created', (_e, contents) => {
 });
 
 // ---- window controls ----
-ipcMain.on('win:minimize', () => win && win.minimize());
-ipcMain.on('win:maximize', () => { if (!win) return; win.isMaximized() ? win.unmaximize() : win.maximize(); });
+ipcMain.on('win:minimize', () => !hiddenTestRun && win && win.minimize());
+ipcMain.on('win:maximize', () => { if (hiddenTestRun || !win) return; win.isMaximized() ? win.unmaximize() : win.maximize(); });
 ipcMain.on('win:close', () => win && win.close());
 // The renderer reports terminal focus so the reload guard can let Ctrl+R (reverse search)
 // through to the CLI while a terminal is focused (see before-input-event above).
@@ -645,6 +660,7 @@ ipcMain.handle('brain-chat:end', async () => { try { brainChat.endSession(); } c
 
 // ---- session attention → our own always-on-top toast + taskbar flash (only when unfocused) ----
 ipcMain.on('session:attention', (_e, msg) => {
+  if (hiddenTestRun) return;
   if (!win || win.isDestroyed() || win.isFocused()) return;
   if (!msg || typeof msg !== 'object') return;
   const id = String(msg.id || '');
@@ -659,6 +675,7 @@ ipcMain.on('session:attention', (_e, msg) => {
 // the window is NOT focused, so we always show our own top-right toast window (reliable regardless
 // of Windows toast registration / Focus Assist) + flash the taskbar + activate the session on click. ----
 ipcMain.on('session:complete', (_e, msg) => {
+  if (hiddenTestRun) return;
   if (!win || win.isDestroyed() || !msg || typeof msg !== 'object') return;
   const id = String(msg.id || '');
   try { if (!win.isFocused()) win.flashFrame(true); } catch { /* noop */ }
@@ -850,7 +867,17 @@ ipcMain.on('workspace:close-approved', async e => {
     if (quitting) app.quit(); else win?.close();
   } finally { stoppingTerminals = false; }
 });
-app.on('before-quit', e => { quitting = true; if (win && !closeApproved) { e.preventDefault(); send('workspace:close-request', { quitting: true }); } });
+app.on('before-quit', e => {
+  quitting = true;
+  if (win && !closeApproved) { e.preventDefault(); send('workspace:close-request', { quitting: true }); return; }
+  if (!hunterStopped && hunterService) {
+    e.preventDefault();
+    hunterQuitPromise ||= hunterService.shutdown().then(() => { hunterStopped = true; app.quit(); }).catch(error => {
+      hunterQuitPromise = null; quitting = false;
+      dialog.showErrorBox('Discover could not stop', error.message);
+    });
+  }
+});
 app.on('will-quit', () => { workspaces?.closeAll(); if (brainWatch) brainWatch.close(); if (sessionReader) sessionReader.stop(); vizServer.stopVizServer(); dailyopsAgent.cancelAll(); brainChat.cancelAll(); toastWindow.destroy(); });
 app.on('window-all-closed', () => {
   if (sessions) sessions.closeAll();

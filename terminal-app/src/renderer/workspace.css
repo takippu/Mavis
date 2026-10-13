@@ -3,8 +3,22 @@
   color-scheme: light dark;
   --ws-bg:light-dark(#ffffff,#202124);--ws-nav:light-dark(#f2f3f5,#28292d);--ws-top:light-dark(#eceef1,#303136);
   --ws-text:light-dark(#24262b,#ededf0);--ws-sub:light-dark(#646872,#adafb8);--ws-line:light-dark(#dadde3,#42444b);--ws-accent:light-dark(#1768c5,#74b1ff);--ws-selected:light-dark(#dce9fa,#32435b);
+  --ws-warm:light-dark(#a83a12,#ffb08e);--ws-warm-surface:light-dark(#fff0e9,#463029);
+  --ws-info:light-dark(#165db0,#99c5f5);--ws-info-surface:light-dark(#e8f1fc,#283e56);
+  --ws-success:light-dark(#146044,#93d6b4);--ws-success-surface:light-dark(#e8f5ee,#283e34);
+  --ws-warning:light-dark(#98420b,#ffc08c);--ws-warning-surface:light-dark(#fff1db,#463a29);
+  --ws-danger:light-dark(#a72b36,#ffa3ad);--ws-danger-surface:light-dark(#fcecef,#472d35);
   --color-ink:var(--ws-text);--color-pure-white:var(--ws-bg);--color-fog:var(--ws-nav);--color-graphite:var(--ws-sub);--color-ash:var(--ws-sub);--hairline:var(--ws-line);--hairline-soft:var(--ws-line);--color-rust:var(--ws-accent);
   --font-sohne:-apple-system,BlinkMacSystemFont,system-ui,sans-serif;--font-signifier:var(--font-sohne);--font-mono:ui-monospace,SFMono-Regular,Menlo,monospace;--radius-cards:8px;--radius-inputs:5px;
+}
+:root[data-workspace-theme="light"] {
+  --ws-bg:#fafbfc;--ws-nav:#eef0f3;--ws-top:#e6e9ee;--ws-text:#252a33;--ws-sub:#555e6d;--ws-line:#cdd2db;--ws-accent:#165db0;--ws-selected:#dbe7f7;
+}
+:root[data-workspace-theme="slate"] {
+  --ws-bg:#222b36;--ws-nav:#1b232d;--ws-top:#18202a;--ws-text:#e5edf5;--ws-sub:#b0bece;--ws-line:#435165;--ws-accent:#99c5f5;--ws-selected:#354a62;
+}
+:root[data-workspace-theme="sepia"] {
+  --ws-bg:#f5f0e6;--ws-nav:#eae3d6;--ws-top:#e2d9c9;--ws-text:#302d26;--ws-sub:#645d50;--ws-line:#cfc4b1;--ws-accent:#795326;--ws-selected:#e8d8be;
 }
 html,body { background:var(--ws-bg);color:var(--ws-text);font:13px/1.5 var(--font-sohne);letter-spacing:0; }
 [hidden] { display:none!important; }
@@ -197,3 +211,15 @@ button:disabled,[aria-disabled=true] { cursor:not-allowed; }
 .ws-page .mt-field { margin-bottom:14px; }
 .ws-page .mt-pill { border-radius:5px;background:var(--ws-accent);color:light-dark(#fff,#202124); }
 .ws-page .mt-pill-ghost { background:var(--ws-nav);color:var(--ws-text); }
+
+.ws-freelance-nav [aria-label=Quotations] svg { color:var(--ws-warm); }
+.ws-freelance-nav [aria-label=Invoices] svg { color:var(--ws-info); }
+.ws-freelance-nav :is([aria-label=Receipts],[aria-label=Money]) svg { color:var(--ws-success); }
+
+/* Freelance groups preserve the established sidebar controls and reading size. */
+.ws-freelance-nav { display:flex; flex-direction:column; gap:20px; padding:16px 0; }
+.ws-freelance-group { display:flex; flex-direction:column; gap:3px; }
+.ws-freelance-heading { margin:0; padding:4px 12px 8px; font-size:11px; line-height:1.5; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--ws-sub); }
+.ws-freelance-group .ws-button { justify-content:flex-start; }
+.ws-sidebar.collapsed .ws-freelance-heading { display:none; }
+.ws-sidebar.collapsed .ws-freelance-group .ws-button { justify-content:center; }

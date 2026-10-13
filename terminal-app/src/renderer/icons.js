@@ -56,6 +56,7 @@
     'git-branch': '<line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/>',
     changes: '<path d="M12 3v18"/><path d="M5 8h14"/><path d="M5 16h14"/>',
     // tab status icons (session state on the tab dot)
+    dollar: '<path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
     check: '<polyline points="20 6 9 17 4 12"/>',
     help: '<path d="M9.1 9a3 3 0 0 1 5.82 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>',
     // sidebar collapse/expand chevrons (VSCode-style icon rail toggle)

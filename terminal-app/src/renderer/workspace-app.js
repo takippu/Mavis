@@ -6,6 +6,7 @@
   window.addEventListener('unhandledrejection', event => { if (event.reason?.name === 'Canceled' || event.reason?.message === 'Canceled') event.preventDefault(); });
   const projects = new Map(), terminalRoutes = new Map();
   let activeId = null, globalView = null, globalArg, sidebarCollapsed = false, inspectorVisible = false, focusedGroup = 0, persistTimer, closePending = false;
+  const freelanceViews = ['lead-hunter','leads','quotations','invoices','receipts','clients','jobs','money'];
   let memoryScope = 'project'; const memoryViews = ['daily', 'topics', 'character', 'ops', 'mavis-identity', 'mavis-rules'];
   let projectCatalog = [], colorSequence = 0, defaultAgent = 'claude';
   let preferences = { editorFontSize: 14, terminalFontSize: 14, wordWrap: 'off', showHidden: true }, available = [], dragId, booting = true, pmEnabled = false;
@@ -21,17 +22,27 @@
   if (api.platform !== 'darwin') { const min = button('−', 'minimize'); const max = button('□', 'maximize'); const close = button('×', 'windowClose'); toolbar.append(min, max, close); }
   const projectStrip = el('nav', 'ws-projects'); projectStrip.setAttribute('aria-label', 'Project tabs');
   const shell = el('div', 'ws-shell'), sidebar = el('aside', 'ws-sidebar'), nav = el('nav', 'ws-nav'), treeHost = el('div', 'ws-tree'), main = el('main', 'ws-main'), inspector = el('aside', 'ws-inspector');
-  sidebar.setAttribute('aria-label', 'Mavis navigation'); nav.setAttribute('aria-label', 'Sections'); const projectNav = el('nav', 'ws-project-nav'), memoryNav = el('nav', 'ws-memory-nav'); sidebar.append(nav, projectNav, memoryNav, treeHost);
+  sidebar.setAttribute('aria-label', 'Mavis navigation'); nav.setAttribute('aria-label', 'Sections'); const projectNav = el('nav', 'ws-project-nav'), memoryNav = el('nav', 'ws-memory-nav'), freelanceNav = el('nav', 'ws-freelance-nav'); freelanceNav.setAttribute('aria-label', 'Freelance tools'); sidebar.append(nav, projectNav, memoryNav, freelanceNav, treeHost);
   const footer = el('footer', 'ws-footer'), branch = el('span', '', 'Mavis'), changes = el('span'), language = el('span'), status = el('span', 'ws-status', 'Ready'); status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite'); footer.append(branch, changes, language, status);
   const globalHost = el('section', 'ws-page'); globalHost.hidden = true; main.append(globalHost);
   const inspectorDivider = divider('vertical', size => { inspector.style.width = Math.max(180, Math.min(440, size)) + 'px'; }, () => inspector.offsetWidth, true, 'Resize project details');
   shell.append(sidebar, divider('vertical', size => { sidebar.style.width = Math.max(150, Math.min(360, size)) + 'px'; }, () => sidebar.offsetWidth), main, inspectorDivider, inspector);
   app.append(toolbar, projectStrip, shell, footer);
   const navButtons = new Map();
-  for (const [host, items] of [[nav, [['Projects','projects','projects'],['Memory','memory','book'],['Settings','settings','settings']]], [projectNav, [['Files','files','files'],['Search','search','search'],['Changes','changes','git-branch']]], [memoryNav, [['Daily Log','daily','calendar'],['Topics','topics','book'],['Character','character','user'],['Daily Ops','ops','check']]]]) {
+  for (const [host, items] of [[nav, [['Projects','projects','projects'],['Freelance','freelance','briefcase'],['Memory','memory','book'],['Settings','settings','settings']]], [projectNav, [['Files','files','files'],['Search','search','search'],['Changes','changes','git-branch']]], [memoryNav, [['Daily Log','daily','calendar'],['Topics','topics','book'],['Character','character','user'],['Daily Ops','ops','check']]]]) {
     for (const [text,action,icon] of items) { const b = button(text,action,icon); navButtons.set(action,b); host.append(b); }
   }
+  for (const [name, items] of [
+    ['Find work', [['Lead hunter','lead-hunter','search'],['Leads','leads','user']]],
+    ['Client work', [['Clients','clients','user'],['Quotations','quotations','files'],['Tasks','jobs','check']]],
+    ['Finance', [['Invoices','invoices','files'],['Receipts','receipts','check'],['Money','money','dollar']]],
+  ]) {
+    const group = el('section', 'ws-freelance-group'); group.setAttribute('aria-label', name); group.append(el('h2', 'ws-freelance-heading', name));
+    for (const [text, action, icon] of items) { const b = button(text, action, icon); navButtons.set(action, b); group.append(b); }
+    freelanceNav.append(group);
+  }
   memoryNav.hidden = true;
+  freelanceNav.hidden = true;
   function divider(direction, apply, size, reverse = false, label = 'Resize sidebar') {
     const d = el('div', 'ws-divider' + (direction === 'horizontal' ? ' horizontal' : '')); d.tabIndex = 0; d.setAttribute('role', 'separator'); d.setAttribute('aria-label', direction === 'horizontal' && label === 'Resize sidebar' ? 'Resize terminal panel' : label); d.setAttribute('aria-valuemin', '80'); d.setAttribute('aria-valuemax', '1000'); d.setAttribute('aria-valuenow', String(size() || 244)); d.setAttribute('aria-orientation', direction);
     d.addEventListener('pointerdown', e => { const start = direction === 'horizontal' ? e.clientY : e.clientX, old = size(); d.setPointerCapture(e.pointerId); d.setAttribute('aria-valuenow', String(size())); const move = ev => apply(old + (direction === 'horizontal' ? (reverse ? ev.clientY - start : start - ev.clientY) : (reverse ? start - ev.clientX : ev.clientX - start))); const end = () => { d.removeEventListener('pointermove', move); d.removeEventListener('pointerup', end); persist(); }; d.addEventListener('pointermove', move); d.addEventListener('pointerup', end); });
@@ -105,7 +116,7 @@
   function updateProjectControls() {
     const ready = !!ws() && !ws().missing;
     for (const name of ['files', 'search', 'changes']) navButtons.get(name).hidden = !ready;
-    projectNav.hidden = !ready || !!globalView; memoryNav.hidden = !memoryViews.includes(globalView);
+    projectNav.hidden = !ready || !!globalView; memoryNav.hidden = !memoryViews.includes(globalView); freelanceNav.hidden = !freelanceViews.includes(globalView);
     const d = ws()?.docs.get((ws()?.groups[focusedGroup] || ws()?.groups[0])?.file);
     const save = toolbar.querySelector('[aria-label=Save]'); save.disabled = !!globalView || !d || d.kind !== 'text' || !d.dirty || !!d.saving; save.title = save.disabled ? 'No unsaved editable file' : 'Save file (⌘S)';
     toolbar.querySelector('[aria-label="Toggle project details"]').setAttribute('aria-pressed', String(inspectorVisible && !globalView));
@@ -179,10 +190,11 @@
   }
   async function activate(id) {
     if (projects.get(id)?.missing) return locateMissing(projects.get(id));
+    MT.leadHunter?.dispose();
     activeId = id; globalView = null; globalHost.hidden = true; for (const w of projects.values()) if (w.host) w.host.hidden = w.id !== id;
     const w = ws(); focusedGroup = w?.focusedGroup || 0; subtitle.textContent = w?.name || 'Your project workspace'; renderTabs(); if (w) { await renderTree(w); showWorkspaceView(w); renderInspector(w); updateStatus(w); fit(w); if (w.rememberedGlobal) await showGlobal(w.rememberedGlobal); } persist();
   }
-  function updateNav(view) { for (const [name, b] of navButtons) b.setAttribute('aria-pressed', String(name === view || (name === 'character' && ['mavis-identity','mavis-rules'].includes(view)) || (name === 'memory' && memoryViews.includes(view)))); updateProjectControls(); }
+  function updateNav(view) { for (const [name, b] of navButtons) b.setAttribute('aria-pressed', String(name === view || (name === 'freelance' && freelanceViews.includes(view)) || (name === 'character' && ['mavis-identity','mavis-rules'].includes(view)) || (name === 'memory' && memoryViews.includes(view)))); updateProjectControls(); }
   function updateStatus(w) { branch.textContent = w.branch || w.name; changes.textContent = [...w.docs.values()].filter(d => d.dirty).length + ' unsaved'; status.textContent = w.root; }
   function renderInspector(w) {
     inspectorDivider.hidden = !inspectorVisible;
@@ -226,7 +238,7 @@
       d.subscription = model.onDidChangeContent(() => { if (d.reloading || d.kind !== 'text') return; d.dirty = model.getValue() !== d.baseText; clearTimeout(d.recoveryTimer); d.recoveryTimer = setTimeout(() => safe(() => recovery(w, d)), 700); renderFileTabs(w); renderTabs(); updateStatus(w); persist(); }); w.docs.set(rel, d);
       } finally { w.loading.delete(rel); finishLoad(); }
     }
-    if (select) { w.view = 'files'; w.file = rel; showDocument(w, rel); if (w.id === activeId) { globalView = null; globalHost.hidden = true; w.host.hidden = false; showWorkspaceView(w); renderTree(w); renderInspector(w); } }
+    if (select) { w.view = 'files'; w.file = rel; showDocument(w, rel); if (w.id === activeId) { MT.leadHunter?.dispose(); globalView = null; globalHost.hidden = true; w.host.hidden = false; showWorkspaceView(w); renderTree(w); renderInspector(w); } }
     else if (!w.file) w.file = rel;
     if (line) { const g = w.groups[focusedGroup] || w.groups[0]; g.editor.setPosition({ lineNumber: line, column: 1 }); g.editor.revealLineInCenter(line); }
     renderFileTabs(w); persist();
@@ -454,6 +466,8 @@
     w.diff = monaco.editor.createDiffEditor(host, { automaticLayout: true, readOnly: true, fontSize: preferences.editorFontSize, renderSideBySide: true, minimap: { enabled: false } }); w.diffModels = [monaco.editor.createModel(original), monaco.editor.createModel(modified)]; w.diff.setModel({ original: w.diffModels[0], modified: w.diffModels[1] }); w.view = 'diff'; showWorkspaceView(w); fit(w);
   }
   async function showGlobal(view, arg) {
+    MT.leadHunter?.dispose();
+    if (view === 'freelance') view = 'lead-hunter';
     globalArg = arg;
     if (['map', 'ask'].includes(view)) return showGlobal('projects');
     if (ws() && ['daily','topics','character','ops'].includes(view)) { ws().rememberedGlobal = view; persist(); }
@@ -466,13 +480,19 @@
       if (ws()) { const option = el('option', '', ws().name); option.value = 'project'; select.append(option); }
       const all = el('option', '', 'All Projects'); all.value = 'all'; select.append(all); select.value = ws() ? memoryScope : 'all';
       select.onchange = () => { memoryScope = select.value; persist(); safe(() => showGlobal(view)); }; scope.append(label, select);
-    } else scope.append(el('span', '', ['character','mavis-identity','mavis-rules'].includes(view) ? 'Shared Mavis profile and working rules' : view === 'ops' ? 'Daily planning · All Projects' : 'maviscode'));
+    } else scope.append(el('span', '', ['character','mavis-identity','mavis-rules'].includes(view) ? 'Shared Mavis profile and working rules' : view === 'ops' ? 'Daily planning · All Projects' : freelanceViews.includes(view) ? 'Freelance · ' + ({'lead-hunter':'Lead hunter',leads:'Leads',quotations:'Quotations',invoices:'Invoices',receipts:'Receipts',clients:'Clients',jobs:'Tasks',money:'Money overview'}[view]) : 'maviscode'));
     if (ws()) { const back = el('button', 'ws-button', 'Back to ' + ws().name); back.onclick = () => { ws().rememberedGlobal = null; safe(() => activate(activeId)); }; scope.append(back); }
     if (view !== 'projects') globalHost.append(scope); if (project === '__unlinked__' && ['daily','topics'].includes(view)) globalHost.append(el('p', 'ws-notice', 'This folder has no linked project memory. Choose All Projects to browse shared memory.'));
     const holder = el('div'); globalHost.append(holder);
     if (view === 'projects') {
       const projectList = el('div'); holder.append(projectList); await MT.projects.render(projectList, MT.openProject, { onOpenFolder: () => safe(() => openProject()) });
     } else if (view === 'daily') await MT.dailyLog.render(holder, arg, { project });
+    else if (view === 'lead-hunter') await MT.leadHunter.render(holder);
+    else if (view === 'leads') await MT.leads.render(holder, arg);
+    else if (view === 'quotations') await MT.quotations.render(holder, arg);
+    else if (view === 'invoices') await MT.invoices.render(holder, arg);
+    else if (view === 'receipts') await MT.receipts.render(holder, arg);
+    else if (['clients','jobs','money'].includes(view)) await MT.freelance.render(holder, view, arg);
     else if (view === 'topics') await MT.topics.render(holder, arg, { project });
     else if (view === 'character') { await MT.journal.render(holder, { characterOnly: true }); }
     else if (view === 'ops') await MT.dailyops.render(holder);
@@ -536,13 +556,13 @@
     const render = async () => { const token = ++seq; results.replaceChildren(); if (commands) { for (const id of choices.filter(id => commandLabels[id].toLowerCase().includes(search.value.toLowerCase()))) { const b = el('button', 'ws-button', commandLabels[id]); b.onclick = () => { body.closest('.ws-dialog-overlay').querySelector('.ws-dialog-actions button').click(); safe(() => run(id)); }; results.append(b); } } else { if (!w || !search.value.trim()) return; const r = await call('search', { id: w.id, query: search.value, mode: 'files' }); if (token !== seq) return; for (const hit of r.results || []) { const b = el('button', 'ws-button', hit.rel || hit.path); b.onclick = () => { body.closest('.ws-dialog-overlay').querySelector('.ws-dialog-actions button').click(); safe(() => openFile(w, hit.rel || hit.path)); }; results.append(b); } } };
     search.oninput = () => safe(render); render(); const waiting = dialog({ title: commands ? 'Command Palette' : 'Quick Open', body, choices: ['Close'] }); search.focus(); await waiting;
   }
-  const commandLabels = { open: 'Open Folder', projects: 'Projects', save: 'Save File', saveAll: 'Save All Files', saveAs: 'Save As', quickOpen: 'Quick Open File', search: 'Search Project', shell: 'New Shell Terminal', claude: 'New Claude Terminal', codex: 'New Codex Terminal', splitEditor: 'Split Editor', closeSplit: 'Close Editor Split', closeProject: 'Close Project', nextProject: 'Next Project', terminal: 'Toggle Terminal', inspector: 'Toggle Mavis Pane', sidebar: 'Toggle Sidebar', wordWrap: 'Toggle Word Wrap', daily: 'Daily Log', topics: 'Topics', settings: 'Settings', dashboard: 'Brain Overview', newFile: 'New File', newFolder: 'New Folder' };
+  const commandLabels = { open: 'Open Folder', projects: 'Projects', freelance: 'Freelance', 'lead-hunter': 'Freelance: Lead hunter', leads: 'Freelance: Leads', quotations: 'Freelance: Quotations', invoices: 'Freelance: Invoices', receipts: 'Freelance: Receipts', clients: 'Freelance: Clients', jobs: 'Freelance: Tasks', money: 'Freelance: Money overview', save: 'Save File', saveAll: 'Save All Files', saveAs: 'Save As', quickOpen: 'Quick Open File', search: 'Search Project', shell: 'New Shell Terminal', claude: 'New Claude Terminal', codex: 'New Codex Terminal', splitEditor: 'Split Editor', closeSplit: 'Close Editor Split', closeProject: 'Close Project', nextProject: 'Next Project', terminal: 'Toggle Terminal', inspector: 'Toggle Mavis Pane', sidebar: 'Toggle Sidebar', wordWrap: 'Toggle Word Wrap', daily: 'Daily Log', topics: 'Topics', settings: 'Settings', dashboard: 'Brain Overview', newFile: 'New File', newFolder: 'New Folder' };
   async function run(action) {
     const w = ws(), g = w?.groups[focusedGroup] || w?.groups[0], d = w?.docs.get(g?.file);
-    if (['files', 'search', 'changes', 'overview'].includes(action)) { if (!w || w.missing) return showGlobal('projects'); globalView = null; globalHost.hidden = true; w.host.hidden = false; w.view = action; w.rememberedGlobal = null; showWorkspaceView(w); renderTabs(); if (action === 'files') await renderTree(w); renderInspector(w); persist(); return; }
+    if (['files', 'search', 'changes', 'overview'].includes(action)) { if (!w || w.missing) return showGlobal('projects'); MT.leadHunter?.dispose(); globalView = null; globalHost.hidden = true; w.host.hidden = false; w.view = action; w.rememberedGlobal = null; showWorkspaceView(w); renderTabs(); if (action === 'files') await renderTree(w); renderInspector(w); persist(); return; }
     if (action === 'memory') return showGlobal('daily');
     if (action === 'explorerMenu' && w) return actionMenu(treeHost.querySelector('[aria-label="Project folder actions"]') || toolbar, [ ['Project Overview', () => run('overview')], [revealLabel, () => location({ id: w.id }, 'reveal')], ['Copy Full Path', () => location({ id: w.id }, 'copyFull')], { separator: true }, ['New Folder…', () => run('newFolder')], [(preferences.showHidden ? 'Hide' : 'Show') + ' Hidden Files', () => run('toggleHidden')] ]);
-    if (['projects', 'daily', 'topics', 'character', 'settings', 'ops', 'dashboard', 'mavis-identity', 'mavis-rules', 'pm'].includes(action)) return showGlobal(action);
+    if (['projects', 'freelance', 'lead-hunter', 'leads', 'quotations', 'invoices', 'receipts', 'clients', 'jobs', 'money', 'daily', 'topics', 'character', 'settings', 'ops', 'dashboard', 'mavis-identity', 'mavis-rules', 'pm'].includes(action)) return showGlobal(action);
     if (action === 'open') return openProject(); if (action === 'save') return saveDocument(w, d);
     if (action === 'saveAll') {
       const failures = [];
@@ -588,8 +608,22 @@
   MT.projectActions = (anchor, project) => safe(() => projectActions(anchor, project));
   MT.router = { show: (view, arg) => safe(() => ['session', 'files'].includes(view) ? run('files') : showGlobal(({ journal: 'daily', dailyops: 'ops' })[view] || view, arg)), current: () => globalView || ws()?.view };
   MT.session = { activeCwd: () => ws()?.root, count: () => projects.size, applyTerminalSettings: opts => { preferences.terminalFontSize = opts.fontSize || 14; for (const w of projects.values()) for (const t of w.terminals) if (t.term) t.term.options.fontSize = preferences.terminalFontSize; }, refitActive: () => ws() && fit(ws()), open: MT.openProject };
-  MT.theme = { apply(name) { document.documentElement.style.colorScheme = name === 'system' ? 'light dark' : /dark|ink/i.test(name) ? 'dark' : 'light'; monaco.editor.setTheme(actualTheme().background === '#202124' ? 'vs-dark' : 'vs'); for (const w of projects.values()) for (const t of w.terminals) if (t.term) t.term.options.theme = actualTheme(); } };
-  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (document.documentElement.style.colorScheme === 'light dark') MT.theme.apply('system'); });
+  MT.theme = {
+    available: ['system', 'light', 'dark', 'slate', 'sepia'],
+    apply(name) {
+      const root = document.documentElement;
+      const dark = name === 'system' ? matchMedia('(prefers-color-scheme: dark)').matches : ['dark', 'slate', 'ink', 'nocturne', 'xai', 'resend'].includes(name);
+      const resolved = name === 'system' ? (dark ? 'dark' : 'light') : this.available.includes(name) ? name : (dark ? 'dark' : 'light');
+      root.style.colorScheme = dark ? 'dark' : 'light'; root.dataset.workspaceTheme = resolved; root.removeAttribute('data-theme');
+      this.current = name;
+      const palette = getComputedStyle(document.body);
+      const hex = rgb => '#' + rgb.match(/\d+/g).slice(0, 3).map(n => Number(n).toString(16).padStart(2, '0')).join('');
+      monaco.editor.defineTheme('mavis-workspace', { base: dark ? 'vs-dark' : 'vs', inherit: true, rules: [], colors: { 'editor.background': hex(palette.backgroundColor), 'editor.foreground': hex(palette.color) } });
+      monaco.editor.setTheme('mavis-workspace');
+      for (const w of projects.values()) for (const t of w.terminals) if (t.term) t.term.options.theme = actualTheme();
+    },
+  };
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (MT.theme.current === 'system') MT.theme.apply('system'); });
   api.onCommand(id => safe(() => run(id)));
   api.onBrainChanged(() => {
     refreshProjectColors();
@@ -605,6 +639,8 @@
   api.onCloseRequest(async () => {
     if (closePending) return; closePending = true;
     try {
+      if (MT.leadHunter?.beforeClose && !await MT.leadHunter.beforeClose()) return;
+      if (!await MT.leads.beforeClose() || !await MT.quotations.beforeClose() || !await MT.invoices.beforeClose() || !await MT.freelance.beforeClose()) return;
       const running = [...projects.values()].flatMap(w => w.terminals.filter(t => t.ptyId).map(t => w.name + ' / ' + t.label));
       if (running.length && (await dialog({ title: 'Stop running terminals?', text: running.join('\n'), choices: ['Cancel', 'Close'] })).choice !== 'Close') return;
       const dirty = [...projects.values()].flatMap(w => [...w.docs.values()].filter(d => d.dirty).map(d => ({ w, d })));

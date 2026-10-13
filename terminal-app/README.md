@@ -125,3 +125,74 @@ rollback, keeps the same bundle identity and preserves one Dock shortcut.
 - The Mac workspace uses bundled editor workers and supports offline startup.
   Windows retains its path/shortcut adapters; its packaged build needs a separate
   platform walkthrough before claiming Windows visual parity.
+
+## Freelance workspace
+
+Freelance includes Leads, Quotations, Invoices, Receipts, Clients, Tasks and Money.
+Client records support duplicate checks for Discover, and imported Leads retain
+source evidence with validation pending. Billing documents and record backups
+stay local unless you export them.
+
+Isolated unpackaged fixtures using `MAVIS_TEST_USER_DATA` run hidden by default,
+without a Dock/taskbar entry, test toast popups or audio. They can paint and
+capture screenshots in the background; native focus and visible dialogs require
+a separately requested foreground check.
+
+## Lead hunter — Discover
+
+Freelance opens the pixel office. Click Discover, enter a goal and state/region,
+choose industry, city, website/contact observations and source preferences, then
+submit. Tasks run one at a time. Review the saved observations and select **Add to
+Leads**; imported records start as New with validation pending. Existing Leads and
+Clients are checked for duplicates. Possible matches require acknowledgment.
+
+Discover uses the installed Codex CLI and its ChatGPT login, with a separate
+read-only search worker. The verified native-search path for this CLI build uses
+`gpt-5.5` and `standalone_web_search`; incompatible CLI builds fail explicitly.
+It does not switch to API-key billing. Account usage limits still apply.
+The agent menu includes a Model field and remembers the selection locally.
+Each submitted task keeps its own model through retries, pause/resume and app
+restart; older tasks retain GPT-5.5. Unavailable choices are disabled and never
+silently replaced. With the currently verified CLI/login, GPT-5.5 and GPT-6.1 Sol
+can run Discover. GPT-6.1 Sol uses a verified direct-web namespace setting while
+Code Mode host and shell stay disabled. Other catalog models remain unavailable
+until search-only compatibility is checked; GPT-5.4 was rejected for ChatGPT
+authentication.
+Public pages are independently fetched to corroborate observations; missing or
+ambiguous contacts stay empty. Industry and location filters require matching
+source wording; stricter source preferences reject unclassified sources.
+Targeted email or no-website filters can return zero results when public sources
+do not provide enough evidence. A website marked not observed means it was not
+seen in the searched sources; it does not prove that no website exists.
+
+Jobs, completed batches, candidates and import provenance remain in this Mac's
+app data; the Freelance backup includes them. Navigation and closing the Mac
+window keep tasks alive while the app remains running, awake and online. Quit
+and sleep pause unfinished work; Resume continues from saved batches. Pausing
+office animation affects only presentation. Discover currently fails closed on
+Windows until process-tree isolation is verified.
+
+Requests are bounded: 1–500 businesses requested (default 50), ten candidates
+per batch, at most ten batches or fifteen minutes per task, and two minutes per
+batch. A task may finish with fewer results. Authentication/quota waits require
+Resume after recovery; transient network failures have bounded retries.
+
+Verification without provider calls:
+
+```sh
+node --test test/lead-hunter-*.test.js test/leads-store.test.js
+node_modules/.bin/electron scripts/workspace-hunter-smoke.js
+node_modules/.bin/electron scripts/workspace-hunter-lifecycle-smoke.js
+```
+
+A separately authorized live one-batch check writes only temporary fixture
+records and can retain its evidence at the specified output path:
+
+```sh
+MAVIS_HUNTER_LIVE=1 MAVIS_HUNTER_LIVE_OUTPUT=/tmp/hunter-live.json node scripts/lead-hunter-live-smoke.js
+```
+
+Pixel Office artwork is 2dPig's original CC0 pack. Licence, source provenance and
+original pixels are bundled under `src/renderer/assets/lead-hunter/`. Motion is
+implemented with translations, mirrored poses and small bobs; the pack does not
+contain authored walking frames.

@@ -5,6 +5,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('mavis', {
   platform: process.platform,
   workspace: (action, payload) => ipcRenderer.invoke('workspace:' + action, payload),
+  onHunterChanged: cb => { const listener = (_e, snapshot) => cb(snapshot); ipcRenderer.on('workspace:hunter-changed', listener); return () => ipcRenderer.removeListener('workspace:hunter-changed', listener); },
   onWorkspaceChanged: cb => ipcRenderer.on('workspace:changed', (_e, p) => cb(p)),
   onCommand: cb => ipcRenderer.on('workspace:command', (_e, p) => cb(p)),
   onCloseRequest: cb => ipcRenderer.on('workspace:close-request', (_e, p) => cb(p)),

@@ -1,0 +1,11 @@
+2dPig Pixel Office Asset Pack
+Source: https://2dpig.itch.io/pixel-office
+Downloaded file: PixelOffice.zip, itch upload 4257769
+Licence: CC0-1.0, included LICENSE.txt retained beside the mockup.
+Original scene and sprite sheet retained; no generated artwork used in this preview.
+The two Aseprite files contain one static frame each. The renderer draws monitor activity and animates the original poses for Discover, all four coworkers and both pets through translation, a one-pixel step bob and horizontal mirroring; there are no native walking animation frames.
+2dpig-floor-layer.png is the exact 256x112 Floor cel extracted from PixelOffice.aseprite layer 2 at (0,112), with source provenance embedded. The renderer restores vacated sprite positions using this cel and matching original chair/wall strips.
+
+Production asset names: PixelOffice.png, PixelOfficeAssets.png, floor-layer.png.
+Accepted compositor: discover-grouped-nav-v1.html, companion 63166-1791811594.
+Monitor positions and office layout remain those of the original 256x224 artwork.

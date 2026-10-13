@@ -90,7 +90,7 @@
         } else if (Array.isArray(s.enum)) {
           // harness: only offer ids actually installed (already guaranteed >= 2 here, or the row
           // was skipped above); every other enum field is unaffected.
-          const enumValues = key === 'harness' ? s.enum.filter((opt) => harnessInstalled.includes(opt)) : key === 'appTheme' ? s.enum.filter(opt => ['system','light','dark'].includes(opt) || opt === values[key]) : s.enum;
+          const enumValues = key === 'harness' ? s.enum.filter((opt) => harnessInstalled.includes(opt)) : key === 'appTheme' ? s.enum.filter(opt => !MT.theme?.available || MT.theme.available.includes(opt) || opt === values[key]) : s.enum;
           const ddOpts = enumValues.map((opt) => ({ value: opt, label: (s.enumLabels && s.enumLabels[opt]) || opt }));
           input = MT.dropdown.create({ options: ddOpts, value: values[key], className: 'mt-field-input', ariaLabel: s.label || key });
           // live preview: app theme applies on change; Save persists it (only-save-on-Save)
