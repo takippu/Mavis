@@ -28,6 +28,12 @@ function install({ ipcMain, dialog, shell, clipboard, getWindow, dir, getProject
   const identifier = id => { if (typeof id !== 'string' || !id.trim() || id.length > 128) throw new Error('Invalid Discover identifier.'); return id; };
   handle('hunter-status', () => hunter().snapshot());
   handle('hunter-submit', p => hunter().submit(payload(p)));
+  handle('hunter-submit-validation', p => hunter().submitValidation(payload(p)));
+  handle('hunter-candidates', p => hunter().candidatePage(payload(p)));
+  handle('hunter-validation-results', p => hunter().validationPage(payload(p)));
+  handle('hunter-submit-enrichment', p => hunter().submitEnrichment(payload(p)));
+  handle('hunter-enrich-candidates', p => hunter().enrichmentCandidatePage(payload(p)));
+  handle('hunter-enrichment-results', p => hunter().enrichmentPage(payload(p)));
   handle('hunter-pause', () => hunter().pause());
   handle('hunter-resume', () => hunter().resume());
   handle('hunter-cancel', p => hunter().cancel(identifier(payload(p).id)));
@@ -47,8 +53,11 @@ function install({ ipcMain, dialog, shell, clipboard, getWindow, dir, getProject
     if (typeof raw !== 'string' || raw.length > 2048) throw new Error('Invalid public source URL.');
     const safeUrl = require('./lead-hunter-candidates').safePublicUrl(raw);
     if (!safeUrl) throw new Error('Choose a public HTTP or HTTPS source.');
-    const known = hunter().snapshot().candidates.some(c => (c.sources || []).some(s => s.url === raw) || c.website?.url === raw || c.contact?.form === raw);
-    if (!known) throw new Error('This URL is not a source in your Discover results.');
+    const snapshot = hunter().snapshot();
+    const known = snapshot.candidates.some(c => (c.sources || []).some(s => s.url === raw) || c.website?.url === raw || c.contact?.form === raw) ||
+      (snapshot.validationResults || []).some(r => (r.sources || []).some(s => s.url === raw || s.finalUrl === raw)) ||
+      (snapshot.enrichmentResults || []).some(r => (r.sources || []).some(s => s.url === raw || s.finalUrl === raw));
+    if (!known) throw new Error('This URL is not a source in your lead hunter results.');
     await shell.openExternal(safeUrl); return { ok: true };
   });
 

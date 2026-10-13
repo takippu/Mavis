@@ -196,3 +196,72 @@ Pixel Office artwork is 2dPig's original CC0 pack. Licence, source provenance an
 original pixels are bundled under `src/renderer/assets/lead-hunter/`. Motion is
 implemented with translations, mirrored poses and small bobs; the pack does not
 contain authored walking frames.
+
+
+
+## Lead hunter — Validate
+
+Click Validate in the office to choose existing Discover candidates, a goal,
+model and industry/location/website/public-contact criteria. Candidate search
+and result queries return25 rows per page; selections persist across pages and
+searches. Each task accepts1–100 distinct candidates and joins the same saved
+FIFO as Discover. Tasks never run overlapping model workers.
+
+Checks save historical Passed / Needs review / Failed results with acquired
+public evidence. Missing or ambiguous evidence stays Unknown. No observed
+website does not prove website absence; public email association does not prove
+deliverability. Current local duplicate checks exclude the candidate's own
+imported Lead. Validation does not update original candidates, Leads or Clients.
+Partial/cancelled tasks retain checked results and identify unfinished targets.
+
+Existing version1 hunter files migrate in memory and retain their IDs/models;
+the next store write retains the old backup. Version2 tasks require an explicit
+saved model and fail closed if it is missing. Freelance backups include the
+validation task inputs and result history. Storage/task limits still apply;
+pagination does not promise unlimited storage or discovery throughput.
+
+Source verification includes controlled runner transcripts,2000-candidate
+paging/selection,100-target queue batching, mixed-task cancellation/recovery and
+hidden Electron UI fixtures. No fresh live Validate provider run or packaged
+installation has been performed.
+
+```sh
+node --test test/lead-hunter-validation*.test.js test/lead-hunter-pages.test.js
+node_modules/.bin/electron scripts/workspace-validation-smoke.js
+```
+
+
+## Lead hunter — Enrich
+
+Click Enrich to research businesses whose latest submitted Validate task has a
+Passed result. Search/pick25 rows per page, retain selections across pages and
+submit up to100 businesses with a saved model and field groups. Enrich joins
+the same FIFO as Discover and Validate; no automatic next-stage submission.
+
+Research profiles retain source-backed services/products, public contacts,
+observed name/tagline and literal website observations. Unsupported fields stay
+blank/Unknown. Website absence, missing extraction, deliverability, inferred
+brand colours and copied assets are not established by this stage. Optional
+mockup briefs are labelled drafts: proposals derived from observed fields plus
+explicit details that need confirmation. They do not build a website or claim
+existing capabilities.
+
+Inputs retain the submitted candidate/validation reference and observation
+digests. Import metadata alone does not invalidate a validated business.
+Newer unfinished/non-passing checks block older Passed eligibility; later checks
+flag historical profiles without rewriting them. Candidates, original Validate
+results, Leads and Clients are preserved. Version1/2 files migrate to3 in
+memory; next legitimate writes keep backups. Enrich and Validate share reserved
+result capacity within existing20MiB/100-job bounds. Paging bounds query/DOM
+rows; the compatible status transport still carries a full bounded snapshot.
+
+Source verification:719 tests passed/four skipped, editor build, hidden
+2000-eligible Enrich fixture with100-selection cap, original stage/lifecycle
+fixtures and fresh scoped reviews. The390 CSS-pixel drawer branch was tested
+through an isolated fixture override; production desktop minimum is unchanged.
+No fresh live Enrich provider trial or packaged installation was performed.
+
+```sh
+node --test test/lead-hunter-enrichment*.test.js
+node_modules/.bin/electron scripts/workspace-enrichment-smoke.js
+```

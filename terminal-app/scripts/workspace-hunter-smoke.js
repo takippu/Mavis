@@ -35,7 +35,7 @@ app.whenReady().then(async () => {
   await poll(`document.querySelector('#lh-submit-task')&&!document.querySelector('#lh-submit-task').disabled`);
   await poll(`document.querySelector('.lh-canvas').getContext('2d').getImageData(48,30,1,1).data[3]===255`);
   assert.equal(await js(`document.querySelector('.lh-drawer').open`), false);
-  assert.equal(await js(`document.querySelectorAll('.lh-scene button').length`), 1);
+  assert.equal(await js(`document.querySelectorAll('.lh-scene button').length`), 3);
   assert.equal(await js(`document.querySelector('.ws-freelance-nav [aria-label="Lead hunter"]').getAttribute('aria-pressed')`), 'true');
   await capture('office-slate');
   await js(`Object.defineProperty(document,'hidden',{get:()=>false,configurable:true});document.dispatchEvent(new Event('visibilitychange'))`);
@@ -90,8 +90,9 @@ app.whenReady().then(async () => {
   calls[0].resolve({candidates:[candidate('fixture-one','Fixture Workshop <img src=x>','found'),candidate('fixture-two','Fixture Branch','not_observed')],exhausted:true});
   for(let i=0;i<100&&calls.length<2;i++)await delay(30);
   assert.equal(calls.length,2); assert.equal(service.snapshot().jobs[0].status,'completed'); assert.equal(service.snapshot().jobs[1].status,'running');
-  await click('#lh-open-queue'); await poll(`document.querySelectorAll('.lh-candidate').length===2`);
+  await click('#lh-open-queue');
   await js(`document.querySelector('[data-detail$=":results"]').open=true`);
+  await poll(`document.querySelectorAll('.lh-candidate').length===2`);
   assert.equal(await js(`document.querySelector('.lh-candidate-title img')===null`),true);
   assert.equal(await js(`document.querySelector('[data-candidate-id="fixture-two"]').innerText.includes('Possible duplicate')`),true);
   assert.equal(await js(`document.querySelector('[data-candidate-id="fixture-two"]').innerText.includes('No website found in searched sources')`),true);

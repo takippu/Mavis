@@ -6,13 +6,31 @@
     const canvas = document.createElement('canvas');
     canvas.width = 256; canvas.height = 224; canvas.className = 'lh-canvas';
     canvas.setAttribute('role', 'img');
-    canvas.setAttribute('aria-label', 'Pixel Office by 2dPig. Five people and two pets roam and rest. Discover returns to its desk while searching.');
+    canvas.setAttribute('aria-label', 'Pixel Office by 2dPig. Five people and two pets roam and rest. Click Discover, Validate or Enrich to open their menus.');
     const anchor = document.createElement('div'); anchor.className = 'lh-agent-anchor';
     const agent = document.createElement('button'); agent.type = 'button'; agent.className = 'lh-agent'; agent.id = 'lh-discover-agent';
     agent.setAttribute('aria-label', 'Discover agent: open goals and filters'); agent.setAttribute('aria-haspopup', 'dialog'); agent.setAttribute('aria-controls', 'lh-agent-menu');
     const label = document.createElement('span'); label.className = 'lh-agent-label';
     const dot = document.createElement('i'); dot.className = 'lh-agent-dot'; dot.setAttribute('aria-hidden', 'true');
     label.append(dot, document.createTextNode('Discover')); agent.append(label); anchor.append(agent); container.append(canvas, anchor);
+    const validateAnchor = document.createElement('div'); validateAnchor.className = 'lh-agent-anchor';
+    const validator = document.createElement('button'); validator.type = 'button'; validator.className = 'lh-agent lh-validator'; validator.id = 'lh-validate-agent';
+    validator.setAttribute('aria-label', 'Validate agent: open goals and filters'); validator.setAttribute('aria-haspopup', 'dialog'); validator.setAttribute('aria-controls', 'lh-agent-menu');
+    validator.innerHTML = '<span class="lh-agent-label"><i class="lh-agent-dot" aria-hidden="true"></i>Validate</span>';
+    validateAnchor.append(validator); container.append(validateAnchor);
+    let validateRunning = false, validateMenuOpen = false, validateHovering = false;
+    validator.onclick = () => options.onValidate?.();
+    validator.onpointerenter = () => { validateHovering = true; }; validator.onpointerleave = () => { validateHovering = false; };
+
+    const enrichAnchor = document.createElement('div'); enrichAnchor.className = 'lh-agent-anchor';
+    const enricher = document.createElement('button'); enricher.type = 'button'; enricher.className = 'lh-agent lh-enricher'; enricher.id = 'lh-enrich-agent';
+    enricher.setAttribute('aria-label', 'Enrich agent: open goals and field groups'); enricher.setAttribute('aria-haspopup', 'dialog'); enricher.setAttribute('aria-controls', 'lh-agent-menu');
+    enricher.innerHTML = '<span class="lh-agent-label"><i class="lh-agent-dot" aria-hidden="true"></i>Enrich</span>';
+    enrichAnchor.append(enricher); container.append(enrichAnchor);
+    let enrichRunning = false, enrichMenuOpen = false, enrichHovering = false;
+    enricher.onclick = () => options.onEnrich?.();
+    enricher.onpointerenter = () => { enrichHovering = true; }; enricher.onpointerleave = () => { enrichHovering = false; };
+
     const ctx = canvas.getContext('2d'), cleanOffice = document.createElement('canvas'); cleanOffice.width = 256; cleanOffice.height = 224;
     const cleanCtx = cleanOffice.getContext('2d'), officeImage = new Image(), atlasImage = new Image(), floorImage = new Image();
     const motion = matchMedia('(prefers-reduced-motion: reduce)');
@@ -71,6 +89,10 @@
         else { actor.state = 'resting'; actor.wait -= dt; if (actor.wait <= 0) { actor.route = isHome() ? (Math.random() > .3 ? [{ x: 20, y: 188 }, { x: 20, y: 129 }, { x: 48.5, y: 129 }] : [{ x: 20, y: 188 }, { x: 20, y: 217 }]) : [{ x: 20, y: actor.y }, { x: 20, y: 188 }, { ...home }]; actor.state = 'roaming'; } }
       }
       for (const c of coworkers) {
+        if (c === coworkers[0] && validateRunning) { if (c.route.length) advance(c, dt, 40); c.state = c.route.length ? 'returning' : 'working'; continue; }
+        if (c === coworkers[0] && (validateMenuOpen || validateHovering || validator.matches(':focus-visible'))) continue;
+        if (c === coworkers[1] && enrichRunning) { if (c.route.length) advance(c, dt, 40); c.state = c.route.length ? 'returning' : 'working'; continue; }
+        if (c === coworkers[1] && (enrichMenuOpen || enrichHovering || enricher.matches(':focus-visible'))) continue;
         if (c.route.length) {
           c.state = 'roaming'; const before = { x: c.x, y: c.y, route: c.route.map(p => ({ ...p })) }; advance(c, dt, 15);
           if ([actor, ...coworkers, ...pets].some(other => other !== c && overlaps(c, other))) Object.assign(c, before);
@@ -108,6 +130,13 @@
       }
       anchor.style.transform = reduced ? 'translate(0,0)' : 'translate(' + ((actor.x - home.x) / 256 * 100) + '%,' + ((actor.y - home.y) / 224 * 100) + '%)';
       agent.dataset.motion = reduced ? 'resting' : actor.state;
+      const v = coworkers[0];
+      validateAnchor.style.transform = reduced ? 'translate(0,0)' : 'translate(' + ((v.x - v.homeX) / 256 * 100) + '%,' + ((v.y - v.homeY) / 224 * 100) + '%)';
+      validator.dataset.motion = reduced ? 'resting' : v.state;
+      const e = coworkers[1];
+      enrichAnchor.style.transform = reduced ? 'translate(0,0)' : 'translate(' + ((e.x - e.homeX) / 256 * 100) + '%,' + ((e.y - e.homeY) / 224 * 100) + '%)';
+      enricher.dataset.motion = reduced ? 'resting' : e.state;
+
     }
     function frame(t) {
       frameId = null;
@@ -120,10 +149,20 @@
       if (frameId !== null) { cancelAnimationFrame(frameId); frameId = null; }
       previous = 0;
       if (running && !canMove()) { actor.x = home.x; actor.y = home.y; actor.route = []; actor.state = 'working'; }
+      if (validateRunning && !canMove()) { const v = coworkers[0]; v.x = v.homeX; v.y = v.homeY; v.route = []; v.state = 'working'; }
+      if (enrichRunning && !canMove()) { const e = coworkers[1]; e.x = e.homeX; e.y = e.homeY; e.route = []; e.state = 'working'; }
       draw(); if (canMove()) frameId = requestAnimationFrame(frame);
     }
     function update(snapshot) {
-      const jobs = snapshot?.jobs || [], job = jobs.find(j => j.status === 'running');
+      const allJobs = snapshot?.jobs || [], jobs = allJobs.filter(j => !j.kind || j.kind === 'discover'), job = jobs.find(j => j.status === 'running');
+      const validationJobs = allJobs.filter(j => j.kind === 'validate'), validationJob = validationJobs.find(j => j.status === 'running');
+      updateValidate(!!validationJob && !snapshot.paused && !snapshot.error);
+      const validationState = snapshot.error ? 'stopped' : snapshot.paused ? 'paused' : validationJob ? 'running' : validationJobs.find(j => ['waiting', 'paused', 'failed'].includes(j.status))?.status || 'ready';
+      validator.dataset.state = validationState; validator.setAttribute('aria-label', 'Validate agent: ' + validationState + '. Open goals and filters');
+      const enrichJobs = allJobs.filter(j => j.kind === 'enrich'), enrichJob = enrichJobs.find(j => j.status === 'running');
+      updateEnrich(!!enrichJob && !snapshot.paused && !snapshot.error);
+      const enrichState = snapshot.error ? 'stopped' : snapshot.paused ? 'paused' : enrichJob ? 'running' : enrichJobs.find(j => ['waiting', 'paused', 'failed'].includes(j.status))?.status || 'ready';
+      enricher.dataset.state = enrichState; enricher.setAttribute('aria-label', 'Enrich agent: ' + enrichState + '. Open goals and field groups');
       const next = !!job && !snapshot.paused && !snapshot.error;
       state = snapshot.error ? 'stopped' : snapshot.paused ? 'paused' : job ? 'running' : jobs.find(j => ['waiting', 'paused', 'failed'].includes(j.status))?.status || 'ready';
       container.classList.toggle('lh-working', next); agent.dataset.state = state;
@@ -137,8 +176,26 @@
     const observer = new IntersectionObserver(entries => { visible = entries[0].isIntersecting; syncMotion(); }, { threshold: .08 }); observer.observe(canvas);
     for (const image of [officeImage, atlasImage, floorImage]) { image.onload = prepareScenery; image.onerror = () => { if (!destroyed) { canvas.setAttribute('aria-label', 'Office artwork could not load. Use Discover to open goals and filters.'); options.onError?.('The office artwork could not load. Discover controls are still available.'); } }; }
     officeImage.src = new URL('PixelOffice.png', assetRoot).href; atlasImage.src = new URL('PixelOfficeAssets.png', assetRoot).href; floorImage.src = new URL('floor-layer.png', assetRoot).href;
+    function updateValidate(value) {
+        const next = !!value;
+        if (next && !validateRunning) { const v = coworkers[0]; v.route = [];
+          if (Math.abs(v.x-v.homeX) > .1 || Math.abs(v.y-v.homeY) > .1) v.route = [{ x: v.x, y: 129 }, { x: v.homeX, y: 129 }, { x: v.homeX, y: v.homeY }];
+          v.away = false; v.wait = 4; v.state = v.route.length ? 'returning' : 'working';
+        }
+        validateRunning = next; validator.dataset.state = next ? 'running' : 'ready'; validator.setAttribute('aria-label', 'Validate agent: ' + (next ? 'working' : 'ready') + '. Open goals and filters'); syncMotion();
+    }
+    function updateEnrich(value) {
+        const next = !!value;
+        if (next && !enrichRunning) { const e = coworkers[1]; e.route = [];
+          if (Math.abs(e.x-e.homeX) > .1 || Math.abs(e.y-e.homeY) > .1) e.route = [{ x: 246, y: e.y }, { x: 246, y: e.homeY }, { x: e.homeX, y: e.homeY }];
+          e.away = false; e.wait = 4; e.state = e.route.length ? 'returning' : 'working';
+        }
+        enrichRunning = next; enricher.dataset.state = next ? 'running' : 'ready'; enricher.setAttribute('aria-label', 'Enrich agent: ' + (next ? 'working' : 'ready') + '. Open goals and field groups'); syncMotion();
+      }
     return {
-      update, agent,
+      update, agent, validator, enricher,
+      setEnrichMenuOpen(value) { enrichMenuOpen = !!value; },
+      setValidateMenuOpen(value) { validateMenuOpen = !!value; },
       setMenuOpen(value) { menuOpen = !!value; },
       setMotionPaused(value) { motionPaused = !!value; syncMotion(); },
       destroy() { destroyed = true; if (frameId !== null) cancelAnimationFrame(frameId); observer.disconnect(); document.removeEventListener('visibilitychange', syncMotion); motion.removeEventListener('change', syncMotion); for (const image of [officeImage, atlasImage, floorImage]) image.onload = image.onerror = null; }

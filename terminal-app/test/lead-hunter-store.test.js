@@ -48,7 +48,7 @@ test('each task keeps its selected model through reload and cannot change it dur
   assert.deepEqual(fs.readFileSync(store.file), bytes);
 });
 test('legacy tasks keep the original GPT-5.5 model without rewriting data on read', t => {
-  const store = fixture(t); store.enqueue(input()); const data = JSON.parse(fs.readFileSync(store.file)); delete data.jobs[0].model;
+  const store = fixture(t); store.enqueue(input()); const data = JSON.parse(fs.readFileSync(store.file)); data.version = 1; delete data.validationResults; delete data.jobs[0].kind; delete data.jobs[0].model;
   fs.writeFileSync(store.file, JSON.stringify(data)); const before = fs.readFileSync(store.file);
   assert.equal(store.snapshot().jobs[0].model, 'gpt-5.5'); assert.deepEqual(fs.readFileSync(store.file), before);
   data.jobs[0].model = 'bad-model'; fs.writeFileSync(store.file, JSON.stringify(data));

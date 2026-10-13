@@ -38,6 +38,23 @@ function createHunterService({ dir, onChange = () => {}, powerMonitor, store, ru
       if (!choice?.available) throw Object.assign(new Error(choice?.reason || 'This model is unavailable for Discover. Choose another model.'), { code: 'HUNTER_MODEL_UNAVAILABLE' });
       return queue.submit({ ...input, model });
     },
+    submitValidation: async input => {
+      await available();
+      const model = validateModel(input?.model), choice = getModels().find(m => m.id === model);
+      if (!choice?.available) throw Object.assign(new Error(choice?.reason || 'This model is unavailable for Validate. Choose another model.'), { code: 'HUNTER_MODEL_UNAVAILABLE' });
+      return queue.submitValidation({ ...input, model });
+    },
+    candidatePage: input => require('./lead-hunter-pages').candidatePage(store.snapshot(), input),
+    validationPage: input => require('./lead-hunter-pages').validationPage(store.snapshot(), input),
+    submitEnrichment: async input => {
+      await available();
+      const value = require('./lead-hunter-store').validateEnrichmentInput(input);
+      const model = value.model, choice = getModels().find(m => m.id === model);
+      if (!choice?.available) throw Object.assign(new Error(choice?.reason || 'This model is unavailable for Enrich. Choose another model.'), { code: 'HUNTER_MODEL_UNAVAILABLE' });
+      return queue.submitEnrichment(value);
+    },
+    enrichmentCandidatePage: input => require('./lead-hunter-pages').enrichmentCandidatePage(store.snapshot(), input),
+    enrichmentPage: input => require('./lead-hunter-pages').enrichmentPage(store.snapshot(), input),
     pause: async () => { await available(); await queue.pause(); return status(); },
     resume: async () => { await available(); await queue.resume(); return status(); },
     cancel: async id => { await available(); await queue.cancel(id); return status(); },
